@@ -12,10 +12,16 @@ const schema = z.object({
   JWT_SECRET: z.string().min(24, 'JWT_SECRET must be at least 24 characters'),
   JWT_EXPIRES_IN: z.string().default('30d'),
 
-  OTP_DEV_MODE: z
-    .string()
-    .default('true')
-    .transform((v) => v === 'true'),
+  /**
+   * Accept a fixed OTP instead of sending one.
+   *
+   * Left as an optional string rather than defaulting to 'true', because this
+   * flag decides whether anyone can log in as anyone. Defaulting it ON meant a
+   * production deploy that simply did not mention the variable came up with the
+   * door open. It is now resolved against NODE_ENV below: on in development,
+   * off in production unless explicitly and deliberately set to 'true'.
+   */
+  OTP_DEV_MODE: z.string().optional(),
   OTP_DEV_CODE: z.string().default('123456'),
 
   // Which channel carries the OTP. See services/otp-delivery.ts.
@@ -62,10 +68,19 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+const isProd = parsed.data.NODE_ENV === 'production';
+
 export const env = {
   ...parsed.data,
   corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean),
-  isProd: parsed.data.NODE_ENV === 'production',
+  isProd,
+  /**
+   * Fails closed. Unset means ON in development and OFF in production, so a
+   * deploy can only accept the fixed OTP if someone typed OTP_DEV_MODE=true
+   * against a production environment on purpose.
+   */
+  OTP_DEV_MODE:
+    parsed.data.OTP_DEV_MODE !== undefined ? parsed.data.OTP_DEV_MODE === 'true' : !isProd,
 };
 
 /** True when the integration has real credentials configured. */
