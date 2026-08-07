@@ -22,7 +22,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://sendy-api-staging.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://sendyerrands.onrender.com"
       }
     },
 
@@ -33,7 +33,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://sendy-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://sendyerrands.onrender.com"
       }
     }
   },
