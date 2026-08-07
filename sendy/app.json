@@ -9,9 +9,14 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.sendyerrands.app",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
     },
     "android": {
+      "package": "com.sendyerrands.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6297A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
