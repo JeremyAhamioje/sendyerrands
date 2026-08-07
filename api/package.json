@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "description": "Sendy MVP REST API — logistics, errands, pickup & delivery, vendor marketplace.",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "db:check": "tsx scripts/check-db.ts",
     "prisma:generate": "prisma generate",
