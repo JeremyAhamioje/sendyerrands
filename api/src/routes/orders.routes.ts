@@ -53,8 +53,18 @@ const packageSchema = z.object({
   scheduledFor: z.coerce.date().optional(),
 });
 
-// Parcel pricing. Kept server-side so the app can never invent a cheaper fee.
-const PARCEL_FEE_KOBO: Record<string, number> = {
+/**
+ * Parcel pricing. Kept server-side so the app can never invent a cheaper fee.
+ *
+ * Keyed to the schema's own enum rather than `Record<string, number>`: that
+ * made every lookup `number | undefined`, so the call sites needed a `??`
+ * fallback that would silently charge the default fee if a size key were ever
+ * misspelled. Tying it to the enum makes the lookup total — a new size becomes
+ * a compile error here instead of an underpriced delivery.
+ */
+type ParcelSize = z.infer<typeof packageSchema>['size'];
+
+const PARCEL_FEE_KOBO: Record<ParcelSize, number> = {
   SMALL: 130_000,
   MEDIUM: 190_000,
   LARGE: 280_000,
@@ -189,7 +199,7 @@ ordersRouter.post(
     const customerId = req.auth!.id;
     const body = req.body as z.infer<typeof packageSchema>;
 
-    const deliveryFeeKobo = PARCEL_FEE_KOBO[body.size] ?? env.DEFAULT_DELIVERY_FEE_KOBO;
+    const deliveryFeeKobo = PARCEL_FEE_KOBO[body.size];
 
     // A parcel has no goods value — the delivery fee is the whole charge, and
     // there is no service fee to add on top of it.
