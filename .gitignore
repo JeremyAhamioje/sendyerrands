@@ -1,0 +1,44 @@
+# Secrets — never commit these. Each workspace has its own .gitignore too;
+# this is the backstop so a new one can't leak by being added before its own.
+.env
+.env.*
+!.env.example
+
+node_modules/
+
+# Builds
+dist/
+build/
+web-build/
+.expo/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Native signing material
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# Generated native projects
+ios/
+android/
+
+# Tooling output
+.playwright-mcp/
+coverage/
+.cache/
+tmp/
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/

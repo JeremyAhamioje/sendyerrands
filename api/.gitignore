@@ -1,0 +1,28 @@
+# Secrets — never commit these.
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+build/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+coverage/
+.cache/
+tmp/

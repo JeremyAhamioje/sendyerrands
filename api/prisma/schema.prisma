@@ -1,0 +1,525 @@
+// Sendy MVP data model.
+//
+// Money rule: every amount is an Int of KOBO (1 naira = 100 kobo). Never store
+// naira as a float — 0.1 + 0.2 problems become real refund disputes.
+//
+// Order is the single spine for all four pillars (food, marketplace, errand,
+// package). Type-specific fields hang off ErrandDetail / PackageDetail so the
+// rider, tracking and admin code paths stay identical across pillars.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Pooled connection — what the running API uses.
+  url      = env("DATABASE_URL")
+  // Direct (unpooled) connection — migrations only. PgBouncer can't run the
+  // DDL and advisory locks `prisma migrate` needs, so it gets its own URL.
+  // On a plain local Postgres, set both to the same string.
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────── enums
+
+enum OtpPurpose {
+  CUSTOMER_LOGIN
+  RIDER_LOGIN
+}
+
+enum RiderStatus {
+  PENDING       // signed up, documents incomplete
+  IN_REVIEW     // documents submitted, awaiting admin
+  APPROVED      // may accept jobs
+  REJECTED
+  SUSPENDED
+}
+
+enum DocumentType {
+  NIN
+  LICENCE
+  PHOTO
+  VEHICLE_PAPERS
+  GUARANTOR_FORM
+}
+
+enum DocumentStatus {
+  MISSING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrderType {
+  FOOD
+  MARKETPLACE
+  ERRAND
+  PACKAGE
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PLACED
+  VENDOR_ACCEPTED
+  RIDER_ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum ParcelSize {
+  SMALL
+  MEDIUM
+  LARGE
+  EXTRA_LARGE
+}
+
+enum RequestStatus {
+  OPEN          // accepting bids
+  BID_SELECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum BidStatus {
+  SUBMITTED
+  SELECTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  WALLET
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum WalletTxnType {
+  TOPUP
+  ORDER_DEBIT
+  REFUND
+  REFERRAL_BONUS
+  PAYOUT
+  ADJUSTMENT
+}
+
+enum AdminRole {
+  SUPPORT
+  OPERATIONS
+  SUPERADMIN
+}
+
+// ─────────────────────────────────────────────── identity
+
+model User {
+  id                String   @id @default(cuid())
+  phone             String   @unique // E.164, e.g. +2348031234567
+  firstName         String
+  lastName          String
+  email             String?  @unique
+  walletBalanceKobo Int      @default(0)
+  referralCode      String   @unique
+  referredByCode    String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  addresses    Address[]
+  orders       Order[]
+  requests     MarketplaceRequest[]
+  walletTxns   WalletTransaction[]
+
+  @@map("users")
+}
+
+model Rider {
+  id            String      @id @default(cuid())
+  phone         String      @unique
+  firstName     String
+  lastName      String
+  email         String?
+  plateNumber   String?
+  zone          String?
+  status        RiderStatus @default(PENDING)
+  isOnline      Boolean     @default(false)
+  rating        Float       @default(5)
+  completedJobs Int         @default(0)
+  // Payout destination — verified against Paystack before any transfer.
+  bankCode      String?
+  bankAccountNo String?
+  bankName      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  documents RiderDocument[]
+  orders    Order[]
+  earnings  RiderEarning[]
+
+  @@index([isOnline, status])
+  @@map("riders")
+}
+
+model RiderDocument {
+  id         String         @id @default(cuid())
+  riderId    String
+  type       DocumentType
+  fileUrl    String
+  status     DocumentStatus @default(IN_REVIEW)
+  reviewNote String?
+  reviewedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@unique([riderId, type])
+  @@map("rider_documents")
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(OPERATIONS)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  @@map("admins")
+}
+
+model OtpCode {
+  id        String     @id @default(cuid())
+  phone     String
+  codeHash  String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  consumedAt DateTime?
+  attempts  Int        @default(0)
+  createdAt DateTime   @default(now())
+
+  @@index([phone, purpose])
+  @@map("otp_codes")
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String // "Home", "Office"
+  line1     String
+  line2     String?
+  city      String   @default("Lagos")
+  landmark  String? // "opposite the blue gate" — matters more than a street number here
+  contact   String
+  phone     String
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ─────────────────────────────────────────────── vendors & catalog
+
+model Vendor {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  tags            String[]
+  area            String?
+  phone           String?
+  rating          Float    @default(5)
+  ratingCount     Int      @default(0)
+  etaMinMinutes   Int      @default(25)
+  etaMaxMinutes   Int      @default(35)
+  deliveryFeeKobo Int      @default(130000)
+  freeOverKobo    Int?
+  discountLabel   String?
+  isVerified      Boolean  @default(false)
+  isOpen          Boolean  @default(true)
+  opensAt         String? // "08:00"
+  closesAt        String? // "22:00"
+  coverUrl        String?
+  // Vendors may bid on open marketplace requests (design.md §11).
+  canBid          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  products Product[]
+  orders   Order[]
+  bids     Bid[]
+
+  @@map("vendors")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  vendorId    String
+  name        String
+  description String?
+  priceKobo   Int
+  section     String? // "Popular", "Rice & Grains"
+  badge       String? // "Bestseller"
+  imageUrl    String?
+  // true = also listed in the Marketplace tab, not just the vendor's menu
+  isMarketplace Boolean @default(false)
+  isBiddable    Boolean @default(false)
+  inStock       Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([isMarketplace])
+  @@map("products")
+}
+
+// ─────────────────────────────────────────────── orders
+
+model Order {
+  id         String      @id @default(cuid())
+  reference  String      @unique // "SND-8841"
+  type       OrderType
+  status     OrderStatus @default(PENDING_PAYMENT)
+  customerId String
+  vendorId   String?
+  riderId    String?
+  addressId  String?
+
+  subtotalKobo    Int @default(0)
+  deliveryFeeKobo Int @default(0)
+  serviceFeeKobo  Int @default(0)
+  discountKobo    Int @default(0)
+  totalKobo       Int @default(0)
+  // What the rider earns on this job, net of Sendy's commission.
+  riderPayoutKobo Int @default(0)
+
+  // Set when the customer schedules instead of ordering now.
+  scheduledFor DateTime?
+  // 4-digit code the customer reads out at the door (proof of delivery).
+  deliveryCode String?
+  proofUrl     String?
+  cancelReason String?
+
+  placedAt    DateTime?
+  acceptedAt  DateTime?
+  assignedAt  DateTime?
+  pickedUpAt  DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customer      User            @relation(fields: [customerId], references: [id])
+  vendor        Vendor?         @relation(fields: [vendorId], references: [id])
+  rider         Rider?          @relation(fields: [riderId], references: [id])
+  address       Address?        @relation(fields: [addressId], references: [id])
+  items         OrderItem[]
+  events        OrderEvent[]
+  payments      Payment[]
+  errandDetail  ErrandDetail?
+  packageDetail PackageDetail?
+  request       MarketplaceRequest?
+  earning       RiderEarning?
+
+  @@index([customerId, status])
+  @@index([riderId, status])
+  @@index([status, type])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String // denormalised: the menu can change after the order
+  note      String?
+  unitPriceKobo Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+/// Append-only audit trail. The customer's tracking stepper and the admin
+/// timeline are both rendered from these rows — never from status alone.
+model OrderEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  label     String
+  note      String?
+  actorType String? // "customer" | "rider" | "admin" | "system"
+  actorId   String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
+
+model ErrandDetail {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  task           String
+  details        String?
+  pickupName     String
+  pickupAddress  String
+  budgetKobo     Int?
+  // What the rider actually spent, from the receipt. Change is refunded.
+  spentKobo      Int?
+  receiptUrl     String?
+  photoUrls      String[]
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("errand_details")
+}
+
+model PackageDetail {
+  id             String     @id @default(cuid())
+  orderId        String     @unique
+  pickupName     String
+  pickupAddress  String
+  pickupPhone    String?
+  dropoffName    String
+  dropoffAddress String
+  dropoffPhone   String
+  size           ParcelSize @default(SMALL)
+  contents       String? // "Documents", "Food", "Electronics"
+  isFragile      Boolean    @default(false)
+  notes          String?
+  createdAt      DateTime   @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("package_details")
+}
+
+// ─────────────────────────────────────────────── marketplace (design.md §11)
+
+model MarketplaceRequest {
+  id          String        @id @default(cuid())
+  customerId  String
+  title       String
+  details     String?
+  quantity    Int           @default(1)
+  budgetKobo  Int?
+  dropoffArea String
+  addressId   String?
+  photoUrls   String[]
+  status      RequestStatus @default(OPEN)
+  closesAt    DateTime
+  // Set once the customer picks a winner; the order is created at that point.
+  orderId     String?       @unique
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order? @relation(fields: [orderId], references: [id])
+  bids     Bid[]
+
+  @@index([status, closesAt])
+  @@index([customerId])
+  @@map("marketplace_requests")
+}
+
+model Bid {
+  id         String    @id @default(cuid())
+  requestId  String
+  vendorId   String
+  priceKobo  Int
+  etaMinutes Int
+  note       String?
+  status     BidStatus @default(SUBMITTED)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  request MarketplaceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  vendor  Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  // One live bid per vendor per request; they update it rather than stacking.
+  @@unique([requestId, vendorId])
+  @@index([requestId, priceKobo])
+  @@map("bids")
+}
+
+// ─────────────────────────────────────────────── money
+
+model Payment {
+  id         String          @id @default(cuid())
+  orderId    String
+  provider   PaymentProvider
+  reference  String          @unique // Paystack reference, or an internal one for wallet
+  amountKobo Int
+  status     PaymentStatus   @default(PENDING)
+  authorizationUrl String?
+  // Raw provider payload, kept for reconciliation and dispute evidence.
+  providerPayload Json?
+  paidAt     DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model WalletTransaction {
+  id           String        @id @default(cuid())
+  userId       String
+  type         WalletTxnType
+  amountKobo   Int // positive = credit, negative = debit
+  balanceKobo  Int // running balance after this txn, for statements
+  description  String
+  reference    String?
+  createdAt    DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("wallet_transactions")
+}
+
+model RiderEarning {
+  id          String   @id @default(cuid())
+  riderId     String
+  orderId     String   @unique
+  grossKobo   Int
+  commissionKobo Int
+  netKobo     Int
+  isPaidOut   Boolean  @default(false)
+  paidOutAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId, createdAt])
+  @@index([riderId, isPaidOut])
+  @@map("rider_earnings")
+}

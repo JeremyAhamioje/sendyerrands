@@ -1,0 +1,180 @@
+import { api } from './client';
+import type { ApiBid, ApiOrder, ApiProduct, ApiRiderJob, ApiVendor } from './mappers';
+
+/**
+ * One function per endpoint. Thin on purpose — mapping to UI shapes happens in
+ * the hooks, so these stay a faithful mirror of the API surface.
+ */
+
+// ── auth ────────────────────────────────────────────────────
+export type OtpRequestResult = { phone: string; expiresInSeconds: number; devCode?: string };
+export type Session = {
+  token: string;
+  isNewAccount: boolean;
+  user?: ApiUser;
+  rider?: ApiRider;
+  needsProfile?: boolean;
+};
+
+export type ApiUser = {
+  id: string; phone: string; firstName: string; lastName: string;
+  email: string | null; walletBalanceKobo: number; referralCode: string;
+};
+
+export type ApiRider = {
+  id: string; phone: string; firstName: string; lastName: string;
+  status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  isOnline: boolean; rating?: number;
+};
+
+export type ApiAddress = {
+  id: string; label: string; line1: string; line2: string | null;
+  city: string; landmark: string | null; contact: string; phone: string; isDefault: boolean;
+};
+
+export const authApi = {
+  requestOtp: (phone: string, role: 'customer' | 'rider' = 'customer') =>
+    api.post<OtpRequestResult>('/auth/otp/request', { phone, role }),
+
+  verifyOtp: (input: {
+    phone: string; code: string; role?: 'customer' | 'rider';
+    firstName?: string; lastName?: string; email?: string; referredByCode?: string;
+  }) => api.post<Session>('/auth/otp/verify', input),
+
+  session: (token: string) =>
+    api.get<{ actor: 'customer' | 'rider'; user?: ApiUser; rider?: ApiRider }>('/auth/session', token),
+};
+
+// ── customer ────────────────────────────────────────────────
+export const meApi = {
+  get: (token: string) => api.get<ApiUser>('/me', token),
+  update: (body: Partial<Pick<ApiUser, 'firstName' | 'lastName' | 'email'>>, token: string) =>
+    api.patch<ApiUser>('/me', body, token),
+  addresses: (token: string) => api.get<ApiAddress[]>('/me/addresses', token),
+  addAddress: (body: Omit<ApiAddress, 'id'>, token: string) =>
+    api.post<ApiAddress>('/me/addresses', body, token),
+  wallet: (token: string) =>
+    api.get<{ balanceKobo: number; transactions: WalletTxn[] }>('/me/wallet', token),
+};
+
+export type WalletTxn = {
+  id: string; type: string; amountKobo: number; balanceKobo: number;
+  description: string; createdAt: string;
+};
+
+export const vendorsApi = {
+  list: (params: { q?: string; openOnly?: boolean; sort?: string; limit?: number } = {}, token?: string | null) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+    ).toString();
+    return api.get<ApiVendor[]>(`/vendors${qs ? `?${qs}` : ''}`, token);
+  },
+  detail: (slug: string, token?: string | null) => api.get<ApiVendor>(`/vendors/${slug}`, token),
+};
+
+export const ordersApi = {
+  create: (
+    body: { vendorId: string; addressId: string; items: { productId: string; quantity: number; note?: string }[] },
+    token: string
+  ) => api.post<ApiOrder>('/orders', body, token),
+
+  createErrand: (body: Record<string, unknown>, token: string) =>
+    api.post<ApiOrder>('/orders/errand', body, token),
+
+  createPackage: (body: Record<string, unknown>, token: string) =>
+    api.post<ApiOrder>('/orders/package', body, token),
+
+  list: (status: 'active' | 'history' | 'all', token: string) =>
+    api.get<ApiOrder[]>(`/orders?status=${status}`, token),
+
+  detail: (id: string, token: string) => api.get<ApiOrder>(`/orders/${id}`, token),
+
+  cancel: (id: string, reason: string | undefined, token: string) =>
+    api.post<ApiOrder>(`/orders/${id}/cancel`, { reason }, token),
+};
+
+export const paymentsApi = {
+  checkout: (orderId: string, method: 'WALLET' | 'PAYSTACK', token: string) =>
+    api.post<{ method: string; status: string; walletBalanceKobo?: number; authorizationUrl?: string; reference?: string }>(
+      '/payments/checkout',
+      { orderId, method },
+      token
+    ),
+  verify: (reference: string, token: string) =>
+    api.post<{ status: string; orderId: string }>('/payments/verify', { reference }, token),
+};
+
+export const marketplaceApi = {
+  products: (q: string | undefined, token?: string | null) =>
+    api.get<ApiProduct[]>(`/marketplace/products${q ? `?q=${encodeURIComponent(q)}` : ''}`, token),
+
+  /**
+   * One product for the item screen. Serves both a vendor's menu item and a
+   * marketplace listing, so it is not filtered to `isMarketplace`.
+   */
+  product: (id: string, token?: string | null) =>
+    api.get<ApiProduct>(`/marketplace/products/${id}`, token),
+
+  requests: (token: string) =>
+    api.get<(MarketplaceRequest & { _count: { bids: number } })[]>('/marketplace/requests', token),
+
+  createRequest: (body: Record<string, unknown>, token: string) =>
+    api.post<MarketplaceRequest>('/marketplace/requests', body, token),
+
+  requestDetail: (id: string, sort: 'price' | 'eta' | 'rating', token: string) =>
+    api.get<MarketplaceRequest & { bids: ApiBid[]; isOpen: boolean }>(
+      `/marketplace/requests/${id}?sort=${sort}`,
+      token
+    ),
+
+  selectBid: (requestId: string, bidId: string, token: string) =>
+    api.post<ApiOrder>(`/marketplace/requests/${requestId}/select`, { bidId }, token),
+};
+
+export type MarketplaceRequest = {
+  id: string; title: string; details: string | null; quantity: number;
+  budgetKobo: number | null; dropoffArea: string; status: string; closesAt: string;
+};
+
+// ── rider ───────────────────────────────────────────────────
+export const riderApi = {
+  me: (token: string) =>
+    api.get<ApiRider & { today: { earningsKobo: number; trips: number }; zone: string | null; plateNumber: string | null; completedJobs: number }>(
+      '/rider/me',
+      token
+    ),
+
+  setAvailability: (isOnline: boolean, token: string) =>
+    api.patch<{ id: string; isOnline: boolean }>('/rider/availability', { isOnline }, token),
+
+  jobs: (sort: 'nearest' | 'payout', token: string) =>
+    api.get<ApiRiderJob[]>(`/rider/jobs?sort=${sort}`, token),
+
+  job: (id: string, token: string) => api.get<ApiRiderJob & ApiOrder>(`/rider/jobs/${id}`, token),
+
+  accept: (id: string, token: string) => api.post<ApiOrder>(`/rider/jobs/${id}/accept`, {}, token),
+
+  active: (token: string) => api.get<(ApiRiderJob & ApiOrder) | null>('/rider/active', token),
+
+  updateStatus: (
+    id: string,
+    body: { status: 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED'; deliveryCode?: string; proofUrl?: string },
+    token: string
+  ) => api.post<ApiOrder>(`/rider/jobs/${id}/status`, body, token),
+
+  earnings: (range: 'today' | 'week' | 'month', token: string) =>
+    api.get<{
+      availableKobo: number; totalKobo: number; trips: number; rating: number;
+      series: { day: string; valueKobo: number }[];
+      earnings: { id: string; grossKobo: number; commissionKobo: number; netKobo: number; createdAt: string }[];
+    }>(`/rider/earnings?range=${range}`, token),
+};
+
+export const uploadsApi = {
+  signature: (folder: string, token: string) =>
+    api.post<{ signature: string; timestamp: number; folder: string; apiKey: string; cloudName: string; uploadUrl: string }>(
+      '/uploads/signature',
+      { folder },
+      token
+    ),
+};
