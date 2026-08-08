@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { env, features } from '@/config/env';
+import { forbidden } from '@/lib/errors';
 import { apiLimiter, errorHandler, notFoundHandler } from '@/middleware';
 import { adminRouter } from '@/routes/admin.routes';
 import { authRouter } from '@/routes/auth.routes';
@@ -26,7 +27,16 @@ export function createApp() {
       origin(origin, cb) {
         // Native apps and curl send no Origin header — allow those through.
         if (!origin || env.corsOrigins.includes(origin)) return cb(null, true);
-        cb(new Error(`Origin ${origin} is not allowed by CORS.`));
+
+        /**
+         * A plain Error here reaches the error handler as an unknown failure and
+         * becomes a 500 INTERNAL_ERROR, which is actively misleading: the browser
+         * shows a generic network failure and the server log implies the API
+         * broke, when in fact the deploy is simply missing an origin. Raising a
+         * typed 403 names the origin that was rejected, so the fix — add it to
+         * CORS_ORIGINS and restart — is readable straight off the response.
+         */
+        cb(forbidden(`Origin ${origin} is not in CORS_ORIGINS.`));
       },
       credentials: true,
     })
