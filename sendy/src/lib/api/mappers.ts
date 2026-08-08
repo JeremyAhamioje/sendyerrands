@@ -116,7 +116,9 @@ export type ApiOrder = {
   items?: { id: string; name: string; quantity: number; unitPriceKobo?: number; note?: string | null }[];
   packageDetail?: { dropoffAddress: string; size: string } | null;
   errandDetail?: { task: string; pickupName: string } | null;
-  rider?: { firstName: string; lastName: string; plateNumber: string | null; rating: number } | null;
+  // phone is what the track screen's call and WhatsApp buttons dial — without
+  // it they render but cannot do anything.
+  rider?: { firstName: string; lastName: string; plateNumber: string | null; rating: number; phone: string | null } | null;
   stepper?: { status: string; label: string; at: string | null; state: 'done' | 'current' | 'pending' }[];
 };
 

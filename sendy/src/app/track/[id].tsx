@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Badge, Card, Divider, Skeleton } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
-import { MapCanvas, TRACK_ROUTE } from '@/components/ui/MapCanvas';
 import { Screen } from '@/components/ui/Screen';
 import { VerticalStepper } from '@/components/ui/Stepper';
 import { useCancelOrder, useCheckout, useOrder } from '@/lib/api/hooks';
@@ -29,7 +28,7 @@ const HEADLINE: Record<string, string> = {
   REFUNDED: 'Refunded',
 };
 
-/** Order tracking (design.md §10) — live map region, rider card, status stepper. */
+/** Order tracking (design.md §10) — status header, rider card, status stepper. */
 export default function TrackOrder() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -62,7 +61,7 @@ export default function TrackOrder() {
   if (isLoading || !order) {
     return (
       <Screen edges={[]} className="bg-surface">
-        <View className="h-[420px] bg-hairline" />
+        <View className="h-[260px] bg-hairline" />
         <View className="flex-1 bg-white rounded-t-xl -mt-6 p-4">
           <Skeleton className="w-1/2 h-7 mb-4" />
           <Skeleton className="w-full h-20 mb-6" />
@@ -76,19 +75,17 @@ export default function TrackOrder() {
 
   return (
     <Screen edges={[]} className="bg-surface">
-      {/* map */}
-      <View className="h-[420px]">
-        <MapCanvas
-          className="absolute inset-0"
-          route={TRACK_ROUTE}
-          dotted
-          markers={[
-            { x: 16, y: 71, icon: 'storefront', tone: 'white' },
-            { x: 52, y: 49, icon: 'bicycle', tone: 'pink', halo: true },
-            { x: 76, y: 29, icon: 'home', tone: 'white' },
-          ]}
-        />
+      {/*
+        A status header, not a map.
 
+        This was a 420px canvas with a drawn route and a bicycle marker moving
+        along it. Sendy has no location provider and no rider GPS, so that
+        bicycle was decoration — it promised live positioning the product cannot
+        do, on the exact feature that is scoped and priced as MVP 2. Showing a
+        real status the server actually knows is both honest and more useful
+        than a map that never moves.
+      */}
+      <View className="h-[260px] bg-ink">
         <View className="flex-row items-center px-4 pt-12">
           <IconButton
             icon="arrow-back"
@@ -106,6 +103,44 @@ export default function TrackOrder() {
             <Ionicons name="help-buoy-outline" size={16} color={colors.ink} />
             <Text className="text-ink text-[13px] font-semibold ml-2">Help</Text>
           </Pressable>
+        </View>
+
+        <View className="flex-1 items-center justify-center px-8 pb-8">
+          <View className="w-[72px] h-[72px] rounded-full bg-white/10 items-center justify-center">
+            <Ionicons
+              name={
+                order.status === 'cancelled'
+                  ? 'close-circle-outline'
+                  : unpaid
+                    ? 'time-outline'
+                    : enRoute
+                      ? 'bicycle'
+                      : live
+                        ? 'restaurant-outline'
+                        : 'checkmark-circle-outline'
+              }
+              size={32}
+              color={colors.white}
+            />
+          </View>
+          <Text className="text-white text-[20px] font-bold mt-4 text-center">
+            {HEADLINE[status] ?? order.statusLabel}
+          </Text>
+          <Text className="text-white/70 text-[14px] mt-1.5 text-center leading-[20px]">
+            {/*
+              Says where the order is, never where the rider is. The server
+              knows the stage; nothing in this system knows a position.
+            */}
+            {order.status === 'cancelled'
+              ? 'This order was cancelled.'
+              : unpaid
+                ? 'Pay below and we’ll get moving.'
+                : enRoute
+                  ? 'Your rider will call when they arrive.'
+                  : live
+                    ? 'We’ll update this as your order moves.'
+                    : 'Delivered. Thanks for using Sendy.'}
+          </Text>
         </View>
       </View>
 
@@ -215,9 +250,32 @@ export default function TrackOrder() {
                   </Text>
                 </View>
               </View>
-              <IconButton icon="chatbubble-ellipses-outline" accessibilityLabel="Message rider" />
+              {/*
+                Both buttons did nothing. With no live map, contacting the rider
+                IS the tracking — so these have to work. WhatsApp first because
+                it is what people actually use here, and it degrades to the web
+                link if the app is not installed.
+              */}
+              <IconButton
+                icon="logo-whatsapp"
+                accessibilityLabel="Message rider on WhatsApp"
+                onPress={() =>
+                  rider?.phone
+                    ? Linking.openURL(
+                        `https://wa.me/${rider.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                          `Hi, about my Sendy order ${order.reference}`
+                        )}`
+                      )
+                    : undefined
+                }
+              />
               <View className="w-2" />
-              <IconButton icon="call" tone="pink" accessibilityLabel="Call rider" />
+              <IconButton
+                icon="call"
+                tone="pink"
+                accessibilityLabel="Call rider"
+                onPress={() => (rider?.phone ? Linking.openURL(`tel:${rider.phone}`) : undefined)}
+              />
             </Card>
           ) : null}
 
