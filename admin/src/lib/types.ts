@@ -171,4 +171,26 @@ export type Vendor = {
   isOpen: boolean;
   canBid: boolean;
   coverUrl: string | null;
+  /** Decides whether a vendor may be deleted — one with orders may not. */
+  _count: { products: number; orders: number };
+};
+
+/** A catalogue listing, as the admin sees it. */
+export type AdminProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  priceKobo: number;
+  section: string | null;
+  badge: string | null;
+  imageUrl: string | null;
+  isMarketplace: boolean;
+  inStock: boolean;
+  /** How many past order lines reference this listing. */
+  _count: { orderItems: number };
+};
+
+export type VendorCatalogue = {
+  vendor: { id: string; name: string };
+  products: AdminProduct[];
 };

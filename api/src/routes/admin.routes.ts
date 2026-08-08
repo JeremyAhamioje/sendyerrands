@@ -335,3 +335,91 @@ adminRouter.patch(
     res.json({ data: vendor });
   })
 );
+
+/** GET /admin/vendors/:id/products — the vendor's catalogue, for managing listings. */
+adminRouter.get(
+  '/vendors/:id/products',
+  asyncHandler(async (req, res) => {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.params.id! },
+      select: { id: true, name: true },
+    });
+    if (!vendor) throw notFound('Vendor');
+
+    const products = await prisma.product.findMany({
+      where: { vendorId: vendor.id },
+      orderBy: [{ section: 'asc' }, { name: 'asc' }],
+      include: { _count: { select: { orderItems: true } } },
+    });
+
+    res.json({ data: { vendor, products } });
+  })
+);
+
+/**
+ * DELETE /admin/products/:id — remove a listing.
+ *
+ * A hard delete is safe here, which is not obvious. OrderItem denormalises the
+ * name and unit price at the time of purchase and its productId is nullable
+ * with ON DELETE SET NULL, so past orders keep reading correctly — they simply
+ * stop linking to a catalogue entry that no longer exists. Soft-deleting
+ * instead would mean every catalogue query in the app growing an
+ * `isDeleted: false` filter, and the first one that forgot would resurrect the
+ * listing for customers.
+ */
+adminRouter.delete(
+  '/products/:id',
+  asyncHandler(async (req, res) => {
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id! },
+      include: { _count: { select: { orderItems: true } } },
+    });
+    if (!product) throw notFound('Product');
+
+    await prisma.product.delete({ where: { id: product.id } });
+
+    res.json({
+      data: {
+        id: product.id,
+        name: product.name,
+        // Lets the dashboard say what the delete touched rather than guess.
+        orderItemsUnlinked: product._count.orderItems,
+      },
+    });
+  })
+);
+
+/**
+ * DELETE /admin/vendors/:id — remove a vendor that never traded.
+ *
+ * Refused once the vendor has orders. Order.vendorId is ON DELETE SET NULL and
+ * Order stores no vendor name of its own, so deleting a traded vendor would
+ * quietly erase who fulfilled every one of its past orders — unrecoverable, and
+ * invisible until someone went looking for the history. Taking the vendor
+ * offline achieves what deleting is usually meant to achieve, without that.
+ */
+adminRouter.delete(
+  '/vendors/:id',
+  asyncHandler(async (req, res) => {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.params.id! },
+      include: { _count: { select: { products: true, orders: true } } },
+    });
+    if (!vendor) throw notFound('Vendor');
+
+    if (vendor._count.orders > 0) {
+      throw conflict(
+        `${vendor.name} has ${vendor._count.orders} order(s) and cannot be deleted — ` +
+          'that would erase which vendor fulfilled them. Switch it to unverified and ' +
+          'closed instead to take it off the app.'
+      );
+    }
+
+    // Products cascade (Product.vendor is onDelete: Cascade).
+    await prisma.vendor.delete({ where: { id: vendor.id } });
+
+    res.json({
+      data: { id: vendor.id, name: vendor.name, productsDeleted: vendor._count.products },
+    });
+  })
+);

@@ -10,6 +10,7 @@ import type {
   Rider,
   RiderStatus,
   Vendor,
+  VendorCatalogue,
 } from '@/lib/types';
 
 /** Ops screens are watched all day, so live counts refresh on their own. */
@@ -136,5 +137,43 @@ export function useUpdateVendor() {
       return api<Vendor>(`/admin/vendors/${id}`, { method: 'PATCH', body: patch });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vendors'] }),
+  });
+}
+
+/** A vendor's listings. Only fetched once its row is expanded. */
+export function useVendorProducts(vendorId: string | null) {
+  return useQuery({
+    queryKey: ['vendor-products', vendorId],
+    queryFn: () => api<VendorCatalogue>(`/admin/vendors/${vendorId}/products`),
+    enabled: vendorId !== null,
+  });
+}
+
+export function useDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ id: string; name: string; orderItemsUnlinked: number }>(`/admin/products/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor-products'] });
+      // The vendors table shows a product count, so it goes stale too.
+      qc.invalidateQueries({ queryKey: ['vendors'] });
+    },
+  });
+}
+
+export function useDeleteVendor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ id: string; name: string; productsDeleted: number }>(`/admin/vendors/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendors'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
