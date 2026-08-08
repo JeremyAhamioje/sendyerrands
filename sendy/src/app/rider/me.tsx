@@ -6,6 +6,39 @@ import { Badge, Card, ListRow, Verified } from '@/components/ui/atoms';
 import { Screen } from '@/components/ui/Screen';
 import { useRiderMe } from '@/lib/api/hooks';
 import { colors } from '@/lib/theme';
+import { useApp } from '@/store/app';
+
+/** What each vehicle is called here — a tricycle is a keke to everyone who rides one. */
+type RiderStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+
+/** One line of truth per status, so this card can never contradict the dashboard. */
+const VERIFY_COPY: Record<RiderStatus, { title: string; body: string; badge: string }> = {
+  PENDING: {
+    title: 'Verification not started',
+    body: 'Submit your documents to start accepting jobs.',
+    badge: 'Pending',
+  },
+  IN_REVIEW: {
+    title: 'Verification in review',
+    body: 'We have your documents and are checking them.',
+    badge: 'In review',
+  },
+  APPROVED: {
+    title: 'Verification complete',
+    body: 'ID, licence and guarantor approved.',
+    badge: 'Active',
+  },
+  REJECTED: {
+    title: 'Verification unsuccessful',
+    body: 'Something did not check out. Open your documents to re-submit.',
+    badge: 'Rejected',
+  },
+  SUSPENDED: {
+    title: 'Account suspended',
+    body: 'You cannot accept jobs right now. Contact rider support.',
+    badge: 'Suspended',
+  },
+};
 
 /** What each vehicle is called here — a tricycle is a keke to everyone who rides one. */
 const VEHICLE_LABEL: Record<string, string> = {
@@ -21,6 +54,9 @@ const VEHICLE_LABEL: Record<string, string> = {
 export default function RiderMe() {
   const router = useRouter();
   const { data: rider } = useRiderMe();
+  const { signOut } = useApp();
+  const status: RiderStatus = rider?.status ?? 'PENDING';
+  const approved = status === 'APPROVED';
   const RIDER = {
     initials: rider ? (rider.firstName[0] + rider.lastName[0]).toUpperCase() : '–',
     name: rider ? rider.firstName + ' ' + rider.lastName : 'Rider',
@@ -56,19 +92,31 @@ export default function RiderMe() {
           </View>
         </View>
 
-        {/* verification */}
+        {/*
+          Driven by the rider's real status. This card used to say "Verification
+          complete — ID, licence and guarantor approved" unconditionally, so an
+          account that had submitted nothing was told it was fully approved,
+          while the dashboard toggle refused to turn on. Two screens
+          contradicting each other about the same fact.
+        */}
         <View className="px-4">
           <Card className="flex-row items-center p-4">
-            <View className="w-10 h-10 rounded-full bg-success/10 items-center justify-center mr-3">
-              <Ionicons name="shield-checkmark" size={19} color={colors.success} />
+            <View
+              className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                approved ? 'bg-success/10' : 'bg-pink-50'
+              }`}
+            >
+              <Ionicons
+                name={approved ? 'shield-checkmark' : 'shield-outline'}
+                size={19}
+                color={approved ? colors.success : colors.pink[600]}
+              />
             </View>
             <View className="flex-1">
-              <Text className="text-ink text-[15px] font-semibold">Verification complete</Text>
-              <Text className="text-muted text-[13px] mt-0.5">
-                ID, licence and guarantor approved
-              </Text>
+              <Text className="text-ink text-[15px] font-semibold">{VERIFY_COPY[status].title}</Text>
+              <Text className="text-muted text-[13px] mt-0.5">{VERIFY_COPY[status].body}</Text>
             </View>
-            <Badge label="Active" tone="success" />
+            <Badge label={VERIFY_COPY[status].badge} tone={approved ? 'success' : 'muted'} />
           </Card>
         </View>
 
@@ -96,12 +144,38 @@ export default function RiderMe() {
         <Card className="mx-4 overflow-hidden">
           <ListRow icon="notifications-outline" label="Job alerts" value="On" />
           <ListRow icon="help-buoy-outline" label="Rider support" />
+          {/*
+            Signs out on the way across. The app holds one session at a time and
+            this is a rider token, so simply navigating to the customer tabs put
+            the rider in an app where every authenticated call 403s — browsing
+            looked fine until they opened Orders. Better to hand them the
+            customer sign-in than a half-working app.
+          */}
           <ListRow
             icon="swap-horizontal-outline"
             label="Switch to customer app"
-            onPress={() => router.replace('/(tabs)/home')}
+            onPress={async () => {
+              await signOut();
+              router.replace('/phone');
+            }}
           />
-          <ListRow icon="log-out-outline" label="Log out" danger last onPress={() => router.replace('/')} />
+          {/*
+            This only navigated to the splash and never cleared the session, so
+            the stored token survived and the splash routed straight back into
+            the rider app — logging out appeared to do nothing. Awaited, because
+            signOut clears SecureStore and the query cache; navigating first
+            races the splash against a token that is about to disappear.
+          */}
+          <ListRow
+            icon="log-out-outline"
+            label="Log out"
+            danger
+            last
+            onPress={async () => {
+              await signOut();
+              router.replace('/');
+            }}
+          />
         </Card>
 
         <Text className="text-muted text-[11px] text-center mt-7">Sendy Rider v1.0.0 (MVP)</Text>

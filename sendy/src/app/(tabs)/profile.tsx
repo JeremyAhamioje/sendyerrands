@@ -113,7 +113,7 @@ export default function Profile() {
             onPress={() => router.push('/become-vendor')}
           />
           <ListRow icon="help-buoy-outline" label="Help & support" onPress={() => router.push('/(tabs)/support')} />
-          <ListRow icon="log-out-outline" label="Log out" danger last onPress={() => { signOut(); router.replace('/'); }} />
+          <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>
 
         <Text className="text-muted text-[11px] text-center mt-7">Sendy v1.0.0 (MVP)</Text>
