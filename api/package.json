@@ -10,6 +10,7 @@
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "db:check": "tsx scripts/check-db.ts",
+    "admin:password": "tsx scripts/set-admin-password.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
