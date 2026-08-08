@@ -50,7 +50,17 @@ export default function OtpScreen() {
       if (!asRider) return router.replace('/(tabs)/home');
       // A rider who hasn't cleared verification can't take jobs, so send them
       // to finish that rather than to a board they can only look at.
-      router.replace(session.rider?.status === 'APPROVED' ? '/rider' : '/rider-verify');
+      /**
+       * Always the dashboard, approved or not.
+       *
+       * Sending unapproved riders straight to the verification screen made
+       * signing in feel like hitting a wall: no dashboard, no way forward, and
+       * a back button that left the rider app entirely. The dashboard carries a
+       * banner for anyone not yet approved, and the server refuses job
+       * acceptance for them anyway (requireApprovedRider), so there is nothing
+       * to protect by locking them out of their own home screen.
+       */
+      router.replace('/rider');
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : 'Could not verify that code.');

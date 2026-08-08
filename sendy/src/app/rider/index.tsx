@@ -43,6 +43,8 @@ export default function RiderHome() {
           <IconButton icon="notifications-outline" badge accessibilityLabel="Notifications" />
         </View>
 
+        <VerificationBanner status={rider?.status} onPress={() => router.push('/rider-verify')} />
+
         {/* online card */}
         <View className="px-4">
           <LinearGradient
@@ -124,5 +126,67 @@ function Metric({ value, label }: { value: string; label: string }) {
       <Text className="text-white text-[18px] font-bold">{value}</Text>
       <Text className="text-white/75 text-[11px] mt-0.5">{label}</Text>
     </View>
+  );
+}
+
+/**
+ * Where an unapproved rider stands, and what to do about it.
+ *
+ * Approved riders see nothing — a permanent banner on the main screen for the
+ * normal case is just noise. The others each get their own copy, because
+ * "pending" (we have not looked yet) and "rejected" (we looked and said no)
+ * call for completely different actions, and a rider who cannot tell them apart
+ * will keep waiting for a decision that already happened.
+ */
+function VerificationBanner({
+  status,
+  onPress,
+}: {
+  status?: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  onPress: () => void;
+}) {
+  if (!status || status === 'APPROVED') return null;
+
+  const copy = {
+    PENDING: {
+      icon: 'document-text-outline' as const,
+      title: 'Finish your verification',
+      body: 'Upload your documents to start accepting jobs.',
+      action: 'Continue',
+    },
+    IN_REVIEW: {
+      icon: 'hourglass-outline' as const,
+      title: 'Verification in review',
+      body: 'We’re checking your documents. This usually takes a working day.',
+      action: 'View',
+    },
+    REJECTED: {
+      icon: 'alert-circle-outline' as const,
+      title: 'Verification unsuccessful',
+      body: 'Something didn’t check out. Open it to see what to re-submit.',
+      action: 'See why',
+    },
+    SUSPENDED: {
+      icon: 'pause-circle-outline' as const,
+      title: 'Account suspended',
+      body: 'You can’t accept jobs right now. Contact support to sort it out.',
+      action: 'Details',
+    },
+  }[status];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${copy.title}. ${copy.body}`}
+      className="mx-4 mb-1 flex-row items-center rounded-md bg-pink-50 px-3.5 py-3"
+    >
+      <Ionicons name={copy.icon} size={20} color={colors.pink[600]} />
+      <View className="flex-1 ml-2.5">
+        <Text className="text-pink-700 text-[14px] font-semibold">{copy.title}</Text>
+        <Text className="text-pink-700/80 text-[12px] mt-0.5 leading-[16px]">{copy.body}</Text>
+      </View>
+      <Text className="text-pink-600 text-[13px] font-bold ml-2">{copy.action}</Text>
+    </Pressable>
   );
 }

@@ -49,7 +49,8 @@ export default function ProfileSetup() {
       await signIn(session.token, asRider ? 'rider' : 'customer');
       // A rider created here is PENDING by definition, so verification is the
       // only useful next screen.
-      router.replace(asRider ? '/rider-verify' : '/(tabs)/home');
+      // The dashboard, not the verification wall — see the note in otp.tsx.
+      router.replace(asRider ? '/rider' : '/(tabs)/home');
     },
     onError: (err) =>
       setError(err instanceof ApiError ? err.message : 'Could not finish setting up your account.'),

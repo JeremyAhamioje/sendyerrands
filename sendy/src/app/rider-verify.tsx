@@ -32,7 +32,7 @@ export default function RiderVerify() {
   return (
     <Screen className="bg-surface">
       <View className="bg-white">
-        <ScreenHeader title="Rider verification" />
+        <ScreenHeader title="Rider verification" onBack={() => router.replace('/rider')} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
@@ -112,10 +112,17 @@ export default function RiderVerify() {
       </ScrollView>
 
       <StickyBar>
+        {/*
+          Document upload is not wired yet — KYC provider is still undecided, so
+          verification is done by the ops team from the dashboard. The button
+          said "Upload guarantor form" and only navigated away, which reads as
+          a broken upload rather than a feature that does not exist. Saying so
+          costs nothing and stops riders retrying it.
+        */}
         <Button
-          title="Upload guarantor form"
-          icon="cloud-upload-outline"
-          onPress={() => router.back()}
+          title="Back to dashboard"
+          icon="arrow-back"
+          onPress={() => router.replace('/rider')}
         />
       </StickyBar>
     </Screen>
