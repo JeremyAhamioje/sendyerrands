@@ -3,7 +3,7 @@ import jwt, { type SignOptions } from 'jsonwebtoken';
 import { env } from '@/config/env';
 import { unauthorized } from './errors';
 
-export type Actor = 'customer' | 'rider' | 'admin';
+export type Actor = 'customer' | 'rider' | 'vendor' | 'admin';
 
 export type TokenPayload = {
   sub: string;

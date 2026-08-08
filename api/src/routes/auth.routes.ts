@@ -18,13 +18,13 @@ const MAX_ATTEMPTS = 5;
 
 const phoneSchema = z.object({
   phone: z.string().min(10, 'Enter a valid phone number.'),
-  role: z.enum(['customer', 'rider']).default('customer'),
+  role: z.enum(['customer', 'rider', 'vendor']).default('customer'),
 });
 
 const verifySchema = z.object({
   phone: z.string().min(10),
   code: z.string().length(6, 'The code is 6 digits.'),
-  role: z.enum(['customer', 'rider']).default('customer'),
+  role: z.enum(['customer', 'rider', 'vendor']).default('customer'),
   // Only used when the account does not exist yet.
   firstName: z.string().min(2).max(40).optional(),
   lastName: z.string().min(2).max(40).optional(),
@@ -56,7 +56,8 @@ authRouter.post(
     const phone = normalisePhone(raw);
     if (!phone) throw badRequest('That does not look like a Nigerian phone number.');
 
-    const purpose = role === 'rider' ? 'RIDER_LOGIN' : 'CUSTOMER_LOGIN';
+    const purpose =
+      role === 'rider' ? 'RIDER_LOGIN' : role === 'vendor' ? 'VENDOR_LOGIN' : 'CUSTOMER_LOGIN';
     const code = env.OTP_DEV_MODE ? env.OTP_DEV_CODE : otpCode();
 
     // Retire any outstanding codes so only the newest one works.
@@ -104,7 +105,8 @@ authRouter.post(
     const phone = normalisePhone(body.phone);
     if (!phone) throw badRequest('That does not look like a Nigerian phone number.');
 
-    const purpose = body.role === 'rider' ? 'RIDER_LOGIN' : 'CUSTOMER_LOGIN';
+    const purpose =
+      body.role === 'rider' ? 'RIDER_LOGIN' : body.role === 'vendor' ? 'VENDOR_LOGIN' : 'CUSTOMER_LOGIN';
 
     const record = await prisma.otpCode.findFirst({
       where: { phone, purpose, consumedAt: null },
@@ -134,6 +136,45 @@ authRouter.post(
      *
      * The code is marked consumed further down, only once a token is issued.
      */
+    const consumeCode = () =>
+      prisma.otpCode.update({ where: { id: record.id }, data: { consumedAt: new Date() } });
+
+    /**
+     * Vendors cannot sign themselves up.
+     *
+     * Customers and riders create their own account on first verify. A vendor
+     * is different: it exists only because ops approved an application, which
+     * is where the business name, category and area come from. If verifying an
+     * unknown number created one, anyone could become a vendor on the Sendy
+     * marketplace by typing their own phone number in.
+     */
+    if (body.role === 'vendor') {
+      const vendor = await prisma.vendor.findUnique({ where: { phone } });
+
+      if (!vendor) {
+        throw unauthorized(
+          'No vendor account uses this number. Apply from Profile → Become a vendor, and we’ll set you up once approved.'
+        );
+      }
+
+      await consumeCode();
+
+      return res.json({
+        data: {
+          token: signToken({ sub: vendor.id, actor: 'vendor' }),
+          isNewAccount: false,
+          vendor: {
+            id: vendor.id,
+            name: vendor.name,
+            slug: vendor.slug,
+            phone: vendor.phone,
+            isVerified: vendor.isVerified,
+            isOpen: vendor.isOpen,
+          },
+        },
+      });
+    }
+
     const isSignup =
       !body.firstName || !body.lastName
         ? await (async () => {
@@ -150,9 +191,6 @@ authRouter.post(
       // with the code still live.
       return res.status(200).json({ data: { needsProfile: true, phone } });
     }
-
-    const consumeCode = () =>
-      prisma.otpCode.update({ where: { id: record.id }, data: { consumedAt: new Date() } });
 
     if (body.role === 'rider') {
       let rider = await prisma.rider.findUnique({ where: { phone } });
@@ -231,9 +269,21 @@ authRouter.post(
 /** GET /auth/session — cheap token check on app launch. */
 authRouter.get(
   '/session',
-  requireAuth('customer', 'rider'),
+  requireAuth('customer', 'rider', 'vendor'),
   asyncHandler(async (req, res) => {
     const { id, actor } = req.auth!;
+
+    // Omitting vendor here would 403 on launch, and the app treats an auth
+    // error from this call as an expired token — so every vendor would be
+    // silently signed out the moment they reopened the app.
+    if (actor === 'vendor') {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id },
+        select: { id: true, name: true, slug: true, phone: true, isVerified: true, isOpen: true },
+      });
+      if (!vendor) throw unauthorized();
+      return res.json({ data: { actor, vendor } });
+    }
 
     if (actor === 'rider') {
       const rider = await prisma.rider.findUnique({

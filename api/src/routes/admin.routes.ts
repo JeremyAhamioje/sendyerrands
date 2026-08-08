@@ -469,6 +469,23 @@ adminRouter.post(
 
     const slug = await uniqueVendorSlug(application.businessName);
 
+    /**
+     * The application's phone becomes the vendor's login, so approval is the
+     * moment the applicant can actually sign in. It is unique across vendors —
+     * if that number already runs one, ops has to sort out which business it
+     * belongs to rather than have the second approval fail on a constraint.
+     */
+    const phoneTaken = await prisma.vendor.findUnique({
+      where: { phone: application.phone },
+      select: { id: true, name: true },
+    });
+
+    if (phoneTaken) {
+      throw conflict(
+        `${application.phone} already signs in for ${phoneTaken.name}. Ask the applicant for a different number before approving.`
+      );
+    }
+
     // One transaction: a Vendor with no application pointing at it would be an
     // orphan ops could not trace back to who asked for it.
     const [, updated] = await prisma.$transaction(async (tx) => {
@@ -477,6 +494,7 @@ adminRouter.post(
           name: application.businessName,
           slug,
           area: application.area,
+          // Doubles as the login for /phone?role=vendor.
           phone: application.phone,
           tags: [application.category],
           isVerified: false,

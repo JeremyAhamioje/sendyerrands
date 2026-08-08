@@ -26,6 +26,7 @@ datasource db {
 enum OtpPurpose {
   CUSTOMER_LOGIN
   RIDER_LOGIN
+  VENDOR_LOGIN
 }
 
 enum RiderStatus {
@@ -259,7 +260,10 @@ model Vendor {
   slug            String   @unique
   tags            String[]
   area            String?
-  phone           String?
+  /// Doubles as the vendor login. Unique so an OTP resolves to one vendor;
+  /// nullable because a vendor ops created by hand may not have one yet, and
+  /// Postgres allows many NULLs under a unique index.
+  phone           String?  @unique
   rating          Float    @default(5)
   ratingCount     Int      @default(0)
   etaMinMinutes   Int      @default(25)

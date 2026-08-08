@@ -15,6 +15,7 @@ import { paymentsRouter, paystackWebhook } from '@/routes/payments.routes';
 import { riderRouter } from '@/routes/rider.routes';
 import { uploadsRouter } from '@/routes/uploads.routes';
 import { vendorApplicationsRouter } from '@/routes/vendor-applications.routes';
+import { vendorRouter } from '@/routes/vendor.routes';
 import { vendorsRouter } from '@/routes/vendors.routes';
 
 export function createApp() {
@@ -81,6 +82,7 @@ export function createApp() {
   v1.use('/orders', ordersRouter);
   v1.use('/marketplace', marketplaceRouter);
   v1.use('/rider', riderRouter);
+  v1.use('/vendor', vendorRouter);
   v1.use('/payments', paymentsRouter);
   v1.use('/uploads', uploadsRouter);
   v1.use('/admin', adminRouter);

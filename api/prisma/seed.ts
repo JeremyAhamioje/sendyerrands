@@ -262,6 +262,21 @@ async function main() {
   }
   console.log(`  ✓ customer ${customer.phone} (wallet ₦5,200)`);
 
+  /**
+   * A login for the demo vendor.
+   *
+   * Vendors cannot sign themselves up — a vendor exists only because ops
+   * approved an application — so without a seeded number there is no way to
+   * open the vendor app at all without going through the whole application
+   * flow first. VENDOR LOGIN: +2348012345678
+   */
+  const vendorLogin = await prisma.vendor.update({
+    where: { slug: 'mama-nkechi' },
+    data: { phone: '+2348012345678' },
+    select: { name: true, phone: true },
+  });
+  console.log(`  ✓ vendor login ${vendorLogin.phone} (${vendorLogin.name})`);
+
   // ── demo rider, already approved so jobs can be accepted ──
   const rider = await prisma.rider.upsert({
     where: { phone: '+2348094482210' },

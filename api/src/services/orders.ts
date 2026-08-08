@@ -69,7 +69,7 @@ function timestampFor(status: OrderStatus): Partial<Prisma.OrderUpdateInput> {
 export async function transitionOrder(
   orderId: string,
   to: OrderStatus,
-  actor: { type: 'customer' | 'rider' | 'admin' | 'system'; id?: string },
+  actor: { type: 'customer' | 'rider' | 'vendor' | 'admin' | 'system'; id?: string },
   opts?: { note?: string; extra?: Prisma.OrderUpdateInput; tx?: Tx }
 ) {
   const run = async (tx: Tx) => {
