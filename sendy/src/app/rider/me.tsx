@@ -7,6 +7,16 @@ import { Screen } from '@/components/ui/Screen';
 import { useRiderMe } from '@/lib/api/hooks';
 import { colors } from '@/lib/theme';
 
+/** What each vehicle is called here — a tricycle is a keke to everyone who rides one. */
+const VEHICLE_LABEL: Record<string, string> = {
+  MOTORBIKE: 'Motorbike',
+  BICYCLE: 'Bicycle',
+  TRICYCLE: 'Keke',
+  CAR: 'Car',
+  VAN: 'Van',
+  FOOT: 'On foot',
+};
+
 /** Rider profile — verification status, vehicle, documents, payout account. */
 export default function RiderMe() {
   const router = useRouter();
@@ -65,7 +75,7 @@ export default function RiderMe() {
         {/* vehicle */}
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">VEHICLE</Text>
         <Card className="mx-4 overflow-hidden">
-          <ListRow icon="bicycle-outline" label="Motorbike" value={RIDER.plate} />
+          <ListRow icon="bicycle-outline" label={VEHICLE_LABEL[rider?.vehicleType ?? 'MOTORBIKE']} value={RIDER.plate} />
           <ListRow icon="map-outline" label="Operating zone" value={RIDER.zone} last />
         </Card>
 

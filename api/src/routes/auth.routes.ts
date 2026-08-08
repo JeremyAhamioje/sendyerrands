@@ -30,6 +30,15 @@ const verifySchema = z.object({
   lastName: z.string().min(2).max(40).optional(),
   email: z.string().email().optional(),
   referredByCode: z.string().optional(),
+  /**
+   * Riders only — what they ride and its plate.
+   *
+   * Collected at sign-up rather than chased later: dispatch matches on vehicle
+   * (a three-bag grocery run cannot go on a bicycle), so a rider without one is
+   * approved but unassignable, which looks like the job board being empty.
+   */
+  vehicleType: z.enum(['MOTORBIKE', 'BICYCLE', 'TRICYCLE', 'CAR', 'VAN', 'FOOT']).optional(),
+  plateNumber: z.string().max(20).optional(),
 });
 
 /**
@@ -151,7 +160,15 @@ authRouter.post(
 
       if (!rider) {
         rider = await prisma.rider.create({
-          data: { phone, firstName: body.firstName!, lastName: body.lastName!, email: body.email },
+          data: {
+            phone,
+            firstName: body.firstName!,
+            lastName: body.lastName!,
+            email: body.email,
+            vehicleType: body.vehicleType,
+            // Bicycles and riders on foot have no plate — store null, not ''.
+            plateNumber: body.plateNumber?.trim().toUpperCase() || null,
+          },
         });
         isNew = true;
       }

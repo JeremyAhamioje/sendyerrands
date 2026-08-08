@@ -269,15 +269,43 @@ async function main() {
       phone: '+2348094482210',
       firstName: 'Emeka',
       lastName: 'Adeyemi',
+      vehicleType: 'MOTORBIKE',
       plateNumber: 'LND-482-GY',
       zone: 'Victoria Island',
       status: 'APPROVED',
       rating: 4.9,
       completedJobs: 34,
     },
+    // vehicleType was added after this rider first existed, so backfill it —
+    // an empty update would leave the demo account without the one field the
+    // vehicle row on the profile screen reads.
+    update: { vehicleType: 'MOTORBIKE' },
+  });
+  console.log(`  ✓ rider ${rider.phone} (approved — can go online)`);
+
+  /**
+   * A second rider left PENDING on purpose.
+   *
+   * The approved one cannot demonstrate anything about verification: the
+   * banner, the disabled availability toggle and the 403 from
+   * PATCH /rider/availability are only reachable from an unapproved account,
+   * and creating one by hand each time means signing up with a throwaway
+   * number and burning an OTP.
+   */
+  const pendingRider = await prisma.rider.upsert({
+    where: { phone: '+2348055512345' },
+    create: {
+      phone: '+2348055512345',
+      firstName: 'Tunde',
+      lastName: 'Bakare',
+      vehicleType: 'TRICYCLE',
+      plateNumber: 'KJA-119-XT',
+      zone: 'Yaba',
+      status: 'PENDING',
+    },
     update: {},
   });
-  console.log(`  ✓ rider ${rider.phone} (approved)`);
+  console.log(`  ✓ rider ${pendingRider.phone} (pending — for testing the verification gate)`);
 
   // ── an open request with competing bids ───────────────────
   // The bids screen has nothing to render without one, and the bidding window

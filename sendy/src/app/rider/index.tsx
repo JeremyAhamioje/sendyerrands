@@ -19,6 +19,7 @@ export default function RiderHome() {
   const { data: jobs = [] } = useRiderJobs();
   const setAvailability = useSetAvailability();
   const online = rider?.isOnline ?? false;
+  const approved = rider?.status === 'APPROVED';
   const RIDER = {
     initials: rider ? (rider.firstName[0] + rider.lastName[0]).toUpperCase() : '–',
     name: rider ? rider.firstName + ' ' + rider.lastName : 'Rider',
@@ -37,8 +38,10 @@ export default function RiderHome() {
             <Text className="text-pink-700 text-[15px] font-bold">{RIDER.initials}</Text>
           </View>
           <View className="flex-1 ml-3">
-            <Text className="text-muted text-[13px]">Good afternoon</Text>
             <Text className="text-ink text-[17px] font-bold">{RIDER.name}</Text>
+            {/* The number, not a greeting: it is the only way to tell which
+                rider account this session belongs to. */}
+            <Text className="text-muted text-[13px] mt-0.5">{rider?.phone ?? '—'}</Text>
           </View>
           <IconButton icon="notifications-outline" badge accessibilityLabel="Notifications" />
         </View>
@@ -62,17 +65,34 @@ export default function RiderHome() {
               </View>
               <Pressable
                 onPress={() => setAvailability.mutate(!online)}
+                disabled={!approved}
                 accessibilityRole="switch"
-                accessibilityState={{ checked: online }}
+                accessibilityState={{ checked: online, disabled: !approved }}
                 accessibilityLabel="Toggle availability"
-                className={`w-14 h-8 rounded-full p-1 ${online ? 'bg-white/30' : 'bg-white/20'}`}
+                className={`w-14 h-8 rounded-full p-1 ${
+                  !approved ? 'bg-white/10' : online ? 'bg-white/30' : 'bg-white/20'
+                }`}
               >
-                <View className={`w-6 h-6 rounded-full bg-white ${online ? 'ml-auto' : ''}`} />
+                <View
+                  className={`w-6 h-6 rounded-full ${approved ? 'bg-white' : 'bg-white/40'} ${
+                    online ? 'ml-auto' : ''
+                  }`}
+                />
               </Pressable>
             </View>
 
+            {/*
+              The server refuses to put an unapproved rider online (403 from
+              PATCH /rider/availability). Without saying so here the toggle just
+              did nothing when tapped, which reads as a broken switch rather
+              than a rule.
+            */}
             <Text className="text-white/80 text-[13px] mt-1.5">
-              {online ? `Receiving requests in ${RIDER.zone}` : 'Go online to receive requests'}
+              {!approved
+                ? 'You can go online once your documents are approved.'
+                : online
+                  ? `Receiving requests in ${RIDER.zone}`
+                  : 'Go online to receive requests'}
             </Text>
 
             <View className="flex-row mt-5">

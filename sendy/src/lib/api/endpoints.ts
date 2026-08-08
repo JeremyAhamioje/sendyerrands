@@ -39,6 +39,8 @@ export const authApi = {
   verifyOtp: (input: {
     phone: string; code: string; role?: 'customer' | 'rider';
     firstName?: string; lastName?: string; email?: string; referredByCode?: string;
+    vehicleType?: 'MOTORBIKE' | 'BICYCLE' | 'TRICYCLE' | 'CAR' | 'VAN' | 'FOOT';
+    plateNumber?: string;
   }) => api.post<Session>('/auth/otp/verify', input),
 
   session: (token: string) =>
@@ -165,7 +167,7 @@ export type MarketplaceRequest = {
 // ── rider ───────────────────────────────────────────────────
 export const riderApi = {
   me: (token: string) =>
-    api.get<ApiRider & { today: { earningsKobo: number; trips: number }; zone: string | null; plateNumber: string | null; completedJobs: number }>(
+    api.get<ApiRider & { today: { earningsKobo: number; trips: number }; zone: string | null; plateNumber: string | null; vehicleType: string | null; completedJobs: number }>(
       '/rider/me',
       token
     ),

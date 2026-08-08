@@ -36,6 +36,17 @@ enum RiderStatus {
   SUSPENDED
 }
 
+/// What a rider actually rides. Drives dispatch — a 3-bag grocery run cannot
+/// go on a bicycle — and identifies them at the door.
+enum VehicleType {
+  MOTORBIKE
+  BICYCLE
+  TRICYCLE // keke napep
+  CAR
+  VAN
+  FOOT
+}
+
 enum DocumentType {
   NIN
   LICENCE
@@ -149,6 +160,9 @@ model Rider {
   firstName     String
   lastName      String
   email         String?
+  /// Structured vehicle data, distinct from the VEHICLE_PAPERS document: this
+  /// is what dispatch matches on, that is a scan a human checks once.
+  vehicleType   VehicleType?
   plateNumber   String?
   zone          String?
   status        RiderStatus @default(PENDING)

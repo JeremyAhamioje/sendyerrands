@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
+import { Chip } from '@/components/ui/atoms';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Screen, ScreenHeader, StickyBar } from '@/components/ui/Screen';
@@ -14,6 +15,20 @@ import { useApp } from '@/store/app';
  * Auth step 3 — profile setup, the last gate before Home (design.md §10).
  * Re-verifies the OTP with a name attached, which is what creates the account.
  */
+type Vehicle = 'MOTORBIKE' | 'BICYCLE' | 'TRICYCLE' | 'CAR' | 'VAN' | 'FOOT';
+
+/** What dispatch can actually match on. Plates only exist for the motorised ones. */
+const VEHICLES: { value: Vehicle; label: string }[] = [
+  { value: 'MOTORBIKE', label: 'Motorbike' },
+  { value: 'TRICYCLE', label: 'Keke' },
+  { value: 'CAR', label: 'Car' },
+  { value: 'VAN', label: 'Van' },
+  { value: 'BICYCLE', label: 'Bicycle' },
+  { value: 'FOOT', label: 'On foot' },
+];
+
+const PLATED: Vehicle[] = ['MOTORBIKE', 'TRICYCLE', 'CAR', 'VAN'];
+
 export default function ProfileSetup() {
   const router = useRouter();
   const { code, role } = useLocalSearchParams<{ code?: string; role?: string }>();
@@ -25,9 +40,15 @@ export default function ProfileSetup() {
   const [last, setLast] = useState('');
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
+  const [vehicle, setVehicle] = useState<Vehicle>('MOTORBIKE');
+  const [plate, setPlate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const valid = first.trim().length > 1 && last.trim().length > 1;
+  const needsPlate = asRider && PLATED.includes(vehicle);
+  const valid =
+    first.trim().length > 1 &&
+    last.trim().length > 1 &&
+    (!needsPlate || plate.trim().length >= 4);
 
   const createAccount = useMutation({
     mutationFn: () =>
@@ -40,6 +61,8 @@ export default function ProfileSetup() {
         email: email.trim() || undefined,
         // Referrals are a customer growth loop; riders have no equivalent.
         referredByCode: asRider ? undefined : referral.trim() || undefined,
+        vehicleType: asRider ? vehicle : undefined,
+        plateNumber: needsPlate ? plate.trim().toUpperCase() : undefined,
       }),
     onSuccess: async (session) => {
       if (!session.token) {
@@ -47,8 +70,6 @@ export default function ProfileSetup() {
         return;
       }
       await signIn(session.token, asRider ? 'rider' : 'customer');
-      // A rider created here is PENDING by definition, so verification is the
-      // only useful next screen.
       // The dashboard, not the verification wall — see the note in otp.tsx.
       router.replace(asRider ? '/rider' : '/(tabs)/home');
     },
@@ -80,7 +101,34 @@ export default function ProfileSetup() {
           keyboardType="email-address"
           helper={asRider ? 'For payout statements.' : 'For receipts and order updates.'}
         />
-        {asRider ? null : (
+        {asRider ? (
+          <>
+            <Text className="text-body text-[15px] mb-2.5">What do you ride?</Text>
+            <View className="flex-row flex-wrap mb-4">
+              {VEHICLES.map((v) => (
+                <View key={v.value} className="mb-2 mr-2">
+                  <Chip
+                    label={v.label}
+                    selected={v.value === vehicle}
+                    onPress={() => setVehicle(v.value)}
+                  />
+                </View>
+              ))}
+            </View>
+
+            {/* A bicycle or a rider on foot has no plate to give. */}
+            {needsPlate ? (
+              <Input
+                label="Plate number"
+                value={plate}
+                onChangeText={setPlate}
+                placeholder="LND-482-GY"
+                icon="car-outline"
+                helper="Customers use this to identify you at the door."
+              />
+            ) : null}
+          </>
+        ) : (
           <Input
             label="Referral code (optional)"
             value={referral}
