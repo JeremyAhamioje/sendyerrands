@@ -55,6 +55,12 @@ export const meApi = {
   addresses: (token: string) => api.get<ApiAddress[]>('/me/addresses', token),
   addAddress: (body: Omit<ApiAddress, 'id'>, token: string) =>
     api.post<ApiAddress>('/me/addresses', body, token),
+  favourites: (token: string) => api.get<ApiVendor[]>('/me/favourites', token),
+  saveVendor: (vendorId: string, token: string) =>
+    api.put<{ vendorId: string; saved: boolean }>(`/me/favourites/${vendorId}`, {}, token),
+  unsaveVendor: (vendorId: string, token: string) =>
+    api.del<{ vendorId: string; saved: boolean }>(`/me/favourites/${vendorId}`, token),
+
   wallet: (token: string) =>
     api.get<{ balanceKobo: number; transactions: WalletTxn[] }>('/me/wallet', token),
 };

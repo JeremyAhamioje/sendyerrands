@@ -64,7 +64,7 @@ export class ApiError extends Error {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   token?: string | null;
   signal?: AbortSignal;
@@ -133,5 +133,7 @@ export const api = {
     request<T>(path, { method: 'POST', body, token }),
   patch: <T>(path: string, body?: unknown, token?: string | null) =>
     request<T>(path, { method: 'PATCH', body, token }),
+  put: <T>(path: string, body?: unknown, token?: string | null) =>
+    request<T>(path, { method: 'PUT', body, token }),
   del: <T>(path: string, token?: string | null) => request<T>(path, { method: 'DELETE', token }),
 };

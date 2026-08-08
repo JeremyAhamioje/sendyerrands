@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useFavouriteIds, useToggleFavourite } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
 import type { Vendor } from '@/lib/mock';
 import { colors } from '@/lib/theme';
@@ -26,7 +26,10 @@ export function VendorCard({
   /** Set for the horizontal carousel; omit for full-width list rows. */
   width?: number;
 }) {
-  const [saved, setSaved] = useState(false);
+  // Saved state lives on the server, so it survives a remount, a reinstall and
+  // a second device — it used to be local component state that reset on scroll.
+  const saved = useFavouriteIds().has(vendor.id);
+  const toggle = useToggleFavourite();
 
   return (
     <View style={width ? { width } : undefined} className={width ? 'mr-3' : 'w-full mb-5'}>
@@ -73,7 +76,7 @@ export function VendorCard({
       </Pressable>
 
       <Pressable
-        onPress={() => setSaved((s) => !s)}
+        onPress={() => toggle.mutate({ vendorId: vendor.id, saved })}
         accessibilityRole="button"
         accessibilityLabel={saved ? 'Remove from favourites' : 'Save vendor'}
         className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 items-center justify-center"

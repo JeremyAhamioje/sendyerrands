@@ -160,3 +160,62 @@ meRouter.get(
     res.json({ data: { balanceKobo: user.walletBalanceKobo, transactions } });
   })
 );
+
+/**
+ * GET /me/favourites — vendors this customer saved.
+ *
+ * Returns whole vendor rows rather than ids: the Favourites screen renders the
+ * same VendorCard as Home, and a list of ids would mean a second round trip
+ * per card on a connection where that is exactly what to avoid.
+ */
+meRouter.get(
+  '/favourites',
+  asyncHandler(async (req, res) => {
+    const favourites = await prisma.favourite.findMany({
+      where: { userId: req.auth!.id },
+      orderBy: { createdAt: 'desc' },
+      include: { vendor: true },
+    });
+
+    res.json({ data: favourites.map((f) => f.vendor) });
+  })
+);
+
+/**
+ * PUT /me/favourites/:vendorId — save a vendor. Idempotent.
+ *
+ * A double tap on the heart, or a retry after a flaky request, must not be an
+ * error: the unique constraint on (userId, vendorId) makes the second write a
+ * no-op rather than a 409 the UI would have to explain.
+ */
+meRouter.put(
+  '/favourites/:vendorId',
+  asyncHandler(async (req, res) => {
+    const vendorId = req.params.vendorId!;
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) throw notFound('Vendor');
+
+    await prisma.favourite.upsert({
+      where: { userId_vendorId: { userId: req.auth!.id, vendorId } },
+      create: { userId: req.auth!.id, vendorId },
+      update: {},
+    });
+
+    res.json({ data: { vendorId, saved: true } });
+  })
+);
+
+/** DELETE /me/favourites/:vendorId — unsave. Also idempotent. */
+meRouter.delete(
+  '/favourites/:vendorId',
+  asyncHandler(async (req, res) => {
+    const vendorId = req.params.vendorId!;
+
+    // deleteMany, not delete: removing something already gone is success here,
+    // not a 404 the heart would have to render as a failure.
+    await prisma.favourite.deleteMany({ where: { userId: req.auth!.id, vendorId } });
+
+    res.json({ data: { vendorId, saved: false } });
+  })
+);

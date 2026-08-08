@@ -146,6 +146,7 @@ model User {
   updatedAt         DateTime @updatedAt
 
   addresses          Address[]
+  favourites         Favourite[]
   orders             Order[]
   requests           MarketplaceRequest[]
   walletTxns         WalletTransaction[]
@@ -279,6 +280,7 @@ model Vendor {
   products    Product[]
   orders      Order[]
   bids        Bid[]
+  favouritedBy Favourite[]
   invitedTo   MarketplaceRequest[] @relation("RequestInvites")
   /// Set when this vendor was created by approving an application.
   application VendorApplication?
@@ -587,4 +589,27 @@ model VendorApplication {
 
   @@index([status, createdAt])
   @@map("vendor_applications")
+}
+
+/**
+ * A vendor a customer saved.
+ *
+ * Server-side rather than on the device: the heart was local component state,
+ * so it reset on every remount and meant nothing on a second device or after a
+ * reinstall. A saved vendor is a signal worth keeping — it is also the only
+ * content behind Profile → Favourites.
+ */
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  vendorId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  /// One row per pair — saving twice is idempotent, not a duplicate.
+  @@unique([userId, vendorId])
+  @@index([userId])
+  @@map("favourites")
 }

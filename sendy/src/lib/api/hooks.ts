@@ -491,3 +491,56 @@ export function useRiderOrders(status: 'active' | 'completed' | 'all' = 'active'
     enabled: Boolean(token),
   });
 }
+
+// ── customer: favourites ────────────────────────────────────
+
+export function useFavourites() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['favourites'],
+    queryFn: async () => (await meApi.favourites(token!)).map(toVendor),
+    enabled: Boolean(token),
+  });
+}
+
+/** Just the ids, for cards that only need to know whether the heart is filled. */
+export function useFavouriteIds(): Set<string> {
+  const { data } = useFavourites();
+  return new Set((data ?? []).map((v) => v.id));
+}
+
+/**
+ * Toggles a saved vendor, updating the cache before the request lands.
+ *
+ * A heart that waits for a round trip reads as an unresponsive button on a
+ * connection where that round trip can take a second. The cache is rolled back
+ * if the write fails, so an optimistic heart never lies for longer than the
+ * request takes to fail.
+ */
+export function useToggleFavourite() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ vendorId, saved }: { vendorId: string; saved: boolean }) =>
+      saved ? meApi.unsaveVendor(vendorId, token!) : meApi.saveVendor(vendorId, token!),
+
+    onMutate: async ({ vendorId, saved }) => {
+      await qc.cancelQueries({ queryKey: ['favourites'] });
+      const previous = qc.getQueryData<ReturnType<typeof toVendor>[]>(['favourites']);
+
+      qc.setQueryData<ReturnType<typeof toVendor>[]>(['favourites'], (old = []) =>
+        saved ? old.filter((v) => v.id !== vendorId) : old
+      );
+
+      return { previous };
+    },
+
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(['favourites'], context.previous);
+    },
+
+    // Saving needs the vendor row the list renders, and only the server has it.
+    onSettled: () => qc.invalidateQueries({ queryKey: ['favourites'] }),
+  });
+}

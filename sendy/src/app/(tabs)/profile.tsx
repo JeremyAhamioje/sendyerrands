@@ -94,7 +94,12 @@ export default function Profile() {
           />
           <ListRow icon="card-outline" label="Payment methods" value="2 cards" />
           <ListRow icon="receipt-outline" label="Order history" onPress={() => router.push('/(tabs)/orders')} />
-          <ListRow icon="heart-outline" label="Favourites" last />
+          <ListRow
+            icon="heart-outline"
+            label="Favourites"
+            last
+            onPress={() => router.push('/favourites')}
+          />
         </Card>
 
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">PREFERENCES</Text>
