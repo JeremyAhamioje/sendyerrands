@@ -194,3 +194,21 @@ export type VendorCatalogue = {
   vendor: { id: string; name: string };
   products: AdminProduct[];
 };
+
+export type VendorApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type VendorApplication = {
+  id: string;
+  businessName: string;
+  category: string;
+  area: string;
+  phone: string;
+  address: string | null;
+  contactName: string | null;
+  note: string | null;
+  status: VendorApplicationStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  applicant: { id: string; firstName: string; lastName: string; phone: string } | null;
+  vendor: { id: string; name: string; slug: string } | null;
+};

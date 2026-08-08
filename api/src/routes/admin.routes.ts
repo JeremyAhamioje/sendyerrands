@@ -336,6 +336,120 @@ adminRouter.patch(
   })
 );
 
+/** GET /admin/vendor-applications?status=PENDING — the onboarding queue. */
+adminRouter.get(
+  '/vendor-applications',
+  asyncHandler(async (req, res) => {
+    const status = req.query.status;
+    const valid = ['PENDING', 'APPROVED', 'REJECTED'] as const;
+    const filter = valid.find((s) => s === status);
+
+    const applications = await prisma.vendorApplication.findMany({
+      where: filter ? { status: filter } : {},
+      // Pending first, then oldest first: an application waiting three days
+      // should be the one ops sees, not the one that arrived this morning.
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+      include: {
+        applicant: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        vendor: { select: { id: true, name: true, slug: true } },
+      },
+      take: 200,
+    });
+
+    res.json({ data: applications });
+  })
+);
+
+/**
+ * Turns a business name into a URL slug, with a numeric suffix if taken.
+ *
+ * Vendor.slug is unique and is what the app routes on, so two applicants both
+ * called "Mama's Kitchen" must not collide — the second approval would throw a
+ * constraint error and lose the review.
+ */
+async function uniqueVendorSlug(businessName: string): Promise<string> {
+  const base =
+    businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'vendor';
+
+  for (let n = 0; ; n++) {
+    const slug = n === 0 ? base : `${base}-${n}`;
+    const taken = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
+    if (!taken) return slug;
+  }
+}
+
+/**
+ * POST /admin/vendor-applications/:id/decide — approve or reject.
+ *
+ * Approving creates the Vendor unverified and closed. The application carries
+ * nothing about delivery fees, opening hours or a catalogue, so a vendor that
+ * went live on approval would be an empty storefront customers could tap into.
+ * Ops fills those in, then flips verified — see the isVerified filter on the
+ * public vendor list.
+ */
+adminRouter.post(
+  '/vendor-applications/:id/decide',
+  validate(
+    z.object({
+      decision: z.enum(['APPROVE', 'REJECT']),
+      note: z.string().max(500).optional(),
+    })
+  ),
+  asyncHandler(async (req, res) => {
+    const { decision, note } = req.body as { decision: 'APPROVE' | 'REJECT'; note?: string };
+
+    const application = await prisma.vendorApplication.findUnique({
+      where: { id: req.params.id! },
+    });
+    if (!application) throw notFound('Application');
+
+    if (application.status !== 'PENDING') {
+      throw conflict(`This application was already ${application.status.toLowerCase()}.`);
+    }
+
+    if (decision === 'REJECT') {
+      const updated = await prisma.vendorApplication.update({
+        where: { id: application.id },
+        data: { status: 'REJECTED', note, reviewedAt: new Date() },
+      });
+      res.json({ data: updated });
+      return;
+    }
+
+    const slug = await uniqueVendorSlug(application.businessName);
+
+    // One transaction: a Vendor with no application pointing at it would be an
+    // orphan ops could not trace back to who asked for it.
+    const [, updated] = await prisma.$transaction(async (tx) => {
+      const vendor = await tx.vendor.create({
+        data: {
+          name: application.businessName,
+          slug,
+          area: application.area,
+          phone: application.phone,
+          tags: [application.category],
+          isVerified: false,
+          isOpen: false,
+        },
+      });
+
+      const app = await tx.vendorApplication.update({
+        where: { id: application.id },
+        data: { status: 'APPROVED', note, reviewedAt: new Date(), vendorId: vendor.id },
+        include: { vendor: { select: { id: true, name: true, slug: true } } },
+      });
+
+      return [vendor, app] as const;
+    });
+
+    res.json({ data: updated });
+  })
+);
+
 /** GET /admin/vendors/:id/products — the vendor's catalogue, for managing listings. */
 adminRouter.get(
   '/vendors/:id/products',

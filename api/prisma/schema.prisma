@@ -12,9 +12,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Pooled connection — what the running API uses.
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // Direct (unpooled) connection — migrations only. PgBouncer can't run the
   // DDL and advisory locks `prisma migrate` needs, so it gets its own URL.
   // On a plain local Postgres, set both to the same string.
@@ -29,9 +29,9 @@ enum OtpPurpose {
 }
 
 enum RiderStatus {
-  PENDING       // signed up, documents incomplete
-  IN_REVIEW     // documents submitted, awaiting admin
-  APPROVED      // may accept jobs
+  PENDING // signed up, documents incomplete
+  IN_REVIEW // documents submitted, awaiting admin
+  APPROVED // may accept jobs
   REJECTED
   SUSPENDED
 }
@@ -78,7 +78,7 @@ enum ParcelSize {
 }
 
 enum RequestStatus {
-  OPEN          // accepting bids
+  OPEN // accepting bids
   BID_SELECTED
   EXPIRED
   CANCELLED
@@ -134,10 +134,11 @@ model User {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  addresses    Address[]
-  orders       Order[]
-  requests     MarketplaceRequest[]
-  walletTxns   WalletTransaction[]
+  addresses          Address[]
+  orders             Order[]
+  requests           MarketplaceRequest[]
+  walletTxns         WalletTransaction[]
+  vendorApplications VendorApplication[]
 
   @@map("users")
 }
@@ -199,14 +200,14 @@ model Admin {
 }
 
 model OtpCode {
-  id        String     @id @default(cuid())
-  phone     String
-  codeHash  String
-  purpose   OtpPurpose
-  expiresAt DateTime
+  id         String     @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    OtpPurpose
+  expiresAt  DateTime
   consumedAt DateTime?
-  attempts  Int        @default(0)
-  createdAt DateTime   @default(now())
+  attempts   Int        @default(0)
+  createdAt  DateTime   @default(now())
 
   @@index([phone, purpose])
   @@map("otp_codes")
@@ -261,28 +262,30 @@ model Vendor {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  products Product[]
-  orders   Order[]
-  bids     Bid[]
+  products    Product[]
+  orders      Order[]
+  bids        Bid[]
+  /// Set when this vendor was created by approving an application.
+  application VendorApplication?
 
   @@map("vendors")
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  vendorId    String
-  name        String
-  description String?
-  priceKobo   Int
-  section     String? // "Popular", "Rice & Grains"
-  badge       String? // "Bestseller"
-  imageUrl    String?
+  id            String   @id @default(cuid())
+  vendorId      String
+  name          String
+  description   String?
+  priceKobo     Int
+  section       String? // "Popular", "Rice & Grains"
+  badge         String? // "Bestseller"
+  imageUrl      String?
   // true = also listed in the Marketplace tab, not just the vendor's menu
-  isMarketplace Boolean @default(false)
-  isBiddable    Boolean @default(false)
-  inStock       Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isMarketplace Boolean  @default(false)
+  isBiddable    Boolean  @default(false)
+  inStock       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
@@ -327,10 +330,10 @@ model Order {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  customer      User            @relation(fields: [customerId], references: [id])
-  vendor        Vendor?         @relation(fields: [vendorId], references: [id])
-  rider         Rider?          @relation(fields: [riderId], references: [id])
-  address       Address?        @relation(fields: [addressId], references: [id])
+  customer      User                @relation(fields: [customerId], references: [id])
+  vendor        Vendor?             @relation(fields: [vendorId], references: [id])
+  rider         Rider?              @relation(fields: [riderId], references: [id])
+  address       Address?            @relation(fields: [addressId], references: [id])
   items         OrderItem[]
   events        OrderEvent[]
   payments      Payment[]
@@ -346,14 +349,14 @@ model Order {
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  productId String?
-  name      String // denormalised: the menu can change after the order
-  note      String?
+  id            String   @id @default(cuid())
+  orderId       String
+  productId     String?
+  name          String // denormalised: the menu can change after the order
+  note          String?
   unitPriceKobo Int
-  quantity  Int      @default(1)
-  createdAt DateTime @default(now())
+  quantity      Int      @default(1)
+  createdAt     DateTime @default(now())
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
@@ -381,18 +384,18 @@ model OrderEvent {
 }
 
 model ErrandDetail {
-  id             String   @id @default(cuid())
-  orderId        String   @unique
-  task           String
-  details        String?
-  pickupName     String
-  pickupAddress  String
-  budgetKobo     Int?
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  task          String
+  details       String?
+  pickupName    String
+  pickupAddress String
+  budgetKobo    Int?
   // What the rider actually spent, from the receipt. Change is refunded.
-  spentKobo      Int?
-  receiptUrl     String?
-  photoUrls      String[]
-  createdAt      DateTime @default(now())
+  spentKobo     Int?
+  receiptUrl    String?
+  photoUrls     String[]
+  createdAt     DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -470,18 +473,18 @@ model Bid {
 // ─────────────────────────────────────────────── money
 
 model Payment {
-  id         String          @id @default(cuid())
-  orderId    String
-  provider   PaymentProvider
-  reference  String          @unique // Paystack reference, or an internal one for wallet
-  amountKobo Int
-  status     PaymentStatus   @default(PENDING)
+  id               String          @id @default(cuid())
+  orderId          String
+  provider         PaymentProvider
+  reference        String          @unique // Paystack reference, or an internal one for wallet
+  amountKobo       Int
+  status           PaymentStatus   @default(PENDING)
   authorizationUrl String?
   // Raw provider payload, kept for reconciliation and dispute evidence.
-  providerPayload Json?
-  paidAt     DateTime?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  providerPayload  Json?
+  paidAt           DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -490,14 +493,14 @@ model Payment {
 }
 
 model WalletTransaction {
-  id           String        @id @default(cuid())
-  userId       String
-  type         WalletTxnType
-  amountKobo   Int // positive = credit, negative = debit
-  balanceKobo  Int // running balance after this txn, for statements
-  description  String
-  reference    String?
-  createdAt    DateTime      @default(now())
+  id          String        @id @default(cuid())
+  userId      String
+  type        WalletTxnType
+  amountKobo  Int // positive = credit, negative = debit
+  balanceKobo Int // running balance after this txn, for statements
+  description String
+  reference   String?
+  createdAt   DateTime      @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -506,15 +509,15 @@ model WalletTransaction {
 }
 
 model RiderEarning {
-  id          String   @id @default(cuid())
-  riderId     String
-  orderId     String   @unique
-  grossKobo   Int
+  id             String    @id @default(cuid())
+  riderId        String
+  orderId        String    @unique
+  grossKobo      Int
   commissionKobo Int
-  netKobo     Int
-  isPaidOut   Boolean  @default(false)
-  paidOutAt   DateTime?
-  createdAt   DateTime @default(now())
+  netKobo        Int
+  isPaidOut      Boolean   @default(false)
+  paidOutAt      DateTime?
+  createdAt      DateTime  @default(now())
 
   rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -522,4 +525,47 @@ model RiderEarning {
   @@index([riderId, createdAt])
   @@index([riderId, isPaidOut])
   @@map("rider_earnings")
+}
+
+/// Where a would-be vendor sits in review. Mirrors RiderStatus, minus
+/// SUSPENDED: suspending a live vendor is done on the Vendor row itself.
+enum VendorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/**
+ * Someone asking to sell on Sendy, from Profile → Become a vendor.
+ * Deliberately not a Vendor row with a pending flag. An unapproved applicant
+ * has none of what a Vendor needs — no slug, no delivery fee, no catalogue —
+ * and every public vendor query would have to remember to exclude them. Kept
+ * separate, approval is the moment a Vendor is created, and the queries that
+ * serve customers cannot accidentally surface an application.
+ */
+model VendorApplication {
+  id           String                  @id @default(cuid())
+  businessName String
+  category     String
+  area         String
+  phone        String
+  address      String?
+  contactName  String?
+  note         String? // why it was rejected, or an internal remark
+  status       VendorApplicationStatus @default(PENDING)
+
+  /// The signed-in customer who applied, so they can be told the outcome.
+  applicantId String?
+  applicant   User?   @relation(fields: [applicantId], references: [id], onDelete: SetNull)
+
+  /// Set once approved — the Vendor this application became.
+  vendorId String? @unique
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@map("vendor_applications")
 }

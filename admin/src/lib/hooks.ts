@@ -10,6 +10,8 @@ import type {
   Rider,
   RiderStatus,
   Vendor,
+  VendorApplication,
+  VendorApplicationStatus,
   VendorCatalogue,
 } from '@/lib/types';
 
@@ -174,6 +176,37 @@ export function useDeleteVendor() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vendors'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// ── vendor applications ─────────────────────────────────────
+
+export function useVendorApplications(status?: VendorApplicationStatus) {
+  return useQuery({
+    queryKey: ['vendor-applications', status ?? 'all'],
+    queryFn: () =>
+      api<VendorApplication[]>(
+        `/admin/vendor-applications${status ? `?status=${status}` : ''}`
+      ),
+    refetchInterval: LIVE_REFETCH_MS,
+  });
+}
+
+export function useDecideApplication() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; decision: 'APPROVE' | 'REJECT'; note?: string }) => {
+      const { id, ...body } = vars;
+      return api<VendorApplication>(`/admin/vendor-applications/${id}/decide`, {
+        method: 'POST',
+        body,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor-applications'] });
+      // Approving creates a vendor, so that list is stale too.
+      qc.invalidateQueries({ queryKey: ['vendors'] });
     },
   });
 }

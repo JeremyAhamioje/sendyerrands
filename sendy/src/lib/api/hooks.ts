@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '@/store/app';
 
 import {
-  marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorsApi,
+  marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorApplicationsApi, vendorsApi,
 } from './endpoints';
+import type { VendorApplicationBody } from './endpoints';
 import {
   koboToNaira, toBid, toMenuItem, toOrder, toProduct, toRiderJob, toVendor,
 } from './mappers';
@@ -414,5 +415,25 @@ export function useRiderEarnings(range: 'today' | 'week' | 'month' = 'week') {
       };
     },
     enabled: Boolean(token),
+  });
+}
+
+// ── customer: selling on Sendy ──────────────────────────────
+
+export function useMyVendorApplications() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['vendor-applications'],
+    queryFn: () => vendorApplicationsApi.mine(token!),
+    enabled: Boolean(token),
+  });
+}
+
+export function useApplyToSell() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: VendorApplicationBody) => vendorApplicationsApi.submit(body, token!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendor-applications'] }),
   });
 }

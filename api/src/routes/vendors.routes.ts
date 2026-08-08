@@ -35,6 +35,16 @@ vendorsRouter.get(
 
     const vendors = await prisma.vendor.findMany({
       where: {
+        /**
+         * Customers only ever see verified vendors.
+         *
+         * Approving a vendor application creates the Vendor row before anyone
+         * has added its catalogue or set its delivery fee, so without this an
+         * approved applicant would appear in browse the same second — an empty
+         * storefront a customer can tap into. Verification is the switch ops
+         * flips when a vendor is genuinely ready to take orders.
+         */
+        isVerified: true,
         ...(q.openOnly ? { isOpen: true } : {}),
         ...(q.minRating ? { rating: { gte: q.minRating } } : {}),
         ...(q.tag ? { tags: { has: q.tag } } : {}),

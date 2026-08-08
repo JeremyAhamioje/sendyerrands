@@ -107,7 +107,11 @@ export default function Profile() {
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">MORE</Text>
         <Card className="mx-4 overflow-hidden">
           <ListRow icon="bicycle-outline" label="Switch to rider app" onPress={() => router.push('/rider')} />
-          <ListRow icon="storefront-outline" label="Become a vendor" />
+          <ListRow
+            icon="storefront-outline"
+            label="Become a vendor"
+            onPress={() => router.push('/become-vendor')}
+          />
           <ListRow icon="help-buoy-outline" label="Help & support" onPress={() => router.push('/(tabs)/support')} />
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={() => { signOut(); router.replace('/'); }} />
         </Card>

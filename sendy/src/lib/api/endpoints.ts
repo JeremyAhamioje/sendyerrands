@@ -62,6 +62,32 @@ export type WalletTxn = {
   description: string; createdAt: string;
 };
 
+export type VendorApplicationBody = {
+  businessName: string;
+  category: string;
+  area: string;
+  phone: string;
+  address?: string;
+  contactName?: string;
+};
+
+export type ApiVendorApplication = {
+  id: string;
+  businessName: string;
+  category: string;
+  area: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  note: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+export const vendorApplicationsApi = {
+  submit: (body: VendorApplicationBody, token: string) =>
+    api.post<ApiVendorApplication>('/vendor-applications', body, token),
+  mine: (token: string) => api.get<ApiVendorApplication[]>('/vendor-applications/mine', token),
+};
+
 export const vendorsApi = {
   list: (params: { q?: string; openOnly?: boolean; sort?: string; limit?: number } = {}, token?: string | null) => {
     const qs = new URLSearchParams(
