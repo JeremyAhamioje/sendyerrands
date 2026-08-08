@@ -1,9 +1,10 @@
 import { useState } from 'react';
 
 import { PageHeader } from '@/components/Layout';
-import { Card, EmptyState, ErrorState, Loading, Pill } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorState, Loading, Pill } from '@/components/ui';
 import { dateTime, fullName, humanise, naira, relative } from '@/lib/format';
-import { useRequests } from '@/lib/hooks';
+import { useInviteVendors, useRequests, useVendors } from '@/lib/hooks';
+import type { MarketplaceRequest } from '@/lib/types';
 
 const TABS = [
   { key: 'OPEN', label: 'Open' },
@@ -140,6 +141,22 @@ export function Requests() {
                       </ul>
                     )}
                   </div>
+
+                  {r.photoUrls && r.photoUrls.length > 0 ? (
+                    <div className="mt-3 flex gap-2 border-t border-hairline pt-3">
+                      {r.photoUrls.map((url) => (
+                        <a key={url} href={url} target="_blank" rel="noreferrer">
+                          <img
+                            src={url}
+                            alt="Attached by the customer"
+                            className="h-16 w-16 rounded-lg object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <Invites request={r} />
                 </Card>
               );
             })}
@@ -147,5 +164,100 @@ export function Requests() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Choose which vendors may quote on a request.
+ *
+ * Only verified vendors with `canBid` are offered: the API rejects the rest,
+ * and offering a vendor ops cannot actually pick reads as a bug.
+ */
+function Invites({ request }: { request: MarketplaceRequest }) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>(request.invitedVendors.map((v) => v.id));
+
+  const { data: vendors } = useVendors();
+  const invite = useInviteVendors();
+
+  const eligible = (vendors ?? []).filter((v) => v.canBid && v.isVerified);
+  const editable = request.status === 'OPEN';
+
+  function toggle(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  }
+
+  return (
+    <div className="mt-3 border-t border-hairline pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
+            Invited vendors
+          </p>
+          <p className="mt-1 text-[13px] text-body">
+            {request.invitedVendors.length === 0
+              ? 'Open to every vendor that can bid.'
+              : request.invitedVendors.map((v) => v.name).join(', ')}
+          </p>
+        </div>
+
+        {editable ? (
+          <Button variant="secondary" size="sm" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Close' : 'Choose vendors'}
+          </Button>
+        ) : null}
+      </div>
+
+      {open && editable ? (
+        <div className="mt-3 rounded-lg bg-surface p-3">
+          {eligible.length === 0 ? (
+            <p className="text-[13px] text-muted">
+              No vendor is both verified and allowed to bid. Enable “Can bid” on the Vendors page.
+            </p>
+          ) : (
+            <>
+              <ul className="mb-3 grid gap-1.5 sm:grid-cols-2">
+                {eligible.map((v) => (
+                  <li key={v.id}>
+                    <label className="flex cursor-pointer items-center gap-2 text-[13px] text-body">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(v.id)}
+                        onChange={() => toggle(v.id)}
+                      />
+                      {v.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  loading={invite.isPending}
+                  onClick={() =>
+                    invite.mutate(
+                      { requestId: request.id, vendorIds: selected },
+                      { onSuccess: () => setOpen(false) }
+                    )
+                  }
+                >
+                  Save
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelected([])}>
+                  Clear (open to all)
+                </Button>
+              </div>
+
+              {invite.isError ? (
+                <p role="alert" className="mt-2 text-[13px] text-error">
+                  {invite.error instanceof Error ? invite.error.message : 'Could not save that.'}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }

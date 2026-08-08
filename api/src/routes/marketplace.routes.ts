@@ -264,9 +264,31 @@ marketplaceRouter.post(
 marketplaceRouter.get(
   '/open-requests',
   requireAuth('admin'),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    /**
+     * `vendorId` narrows the feed to what that vendor may quote on: requests
+     * ops invited them to, plus requests nobody was invited to (still open to
+     * the market). Without it this returns everything, which is what the admin
+     * dashboard wants.
+     *
+     * Invitations would be decorative if this ignored them — ops would tick
+     * three vendors and all of them would still see every request.
+     */
+    const vendorId = req.query.vendorId as string | undefined;
+
     const requests = await prisma.marketplaceRequest.findMany({
-      where: { status: 'OPEN', closesAt: { gt: new Date() } },
+      where: {
+        status: 'OPEN',
+        closesAt: { gt: new Date() },
+        ...(vendorId
+          ? {
+              OR: [
+                { invitedVendors: { some: { id: vendorId } } },
+                { invitedVendors: { none: {} } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { bids: true } } },
       take: 100,

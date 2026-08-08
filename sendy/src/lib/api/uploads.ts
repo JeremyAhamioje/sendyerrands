@@ -1,0 +1,77 @@
+import * as ImagePicker from 'expo-image-picker';
+
+import { api } from './client';
+
+/**
+ * Direct-to-Cloudinary image upload.
+ *
+ * The binary never touches the Sendy API: it mints a short-lived signature,
+ * and the device posts the file straight to Cloudinary. A 4MB photo on a bad
+ * Lagos connection would otherwise occupy a Node worker for the whole upload.
+ * See api/src/services/cloudinary.ts for the other half.
+ */
+
+export type UploadFolder =
+  | 'rider-documents'
+  | 'proof-of-delivery'
+  | 'errand-photos'
+  | 'request-photos'
+  | 'vendor-covers'
+  | 'product-images'
+  | 'avatars';
+
+type Signature = {
+  signature: string;
+  timestamp: number;
+  folder: string;
+  apiKey: string;
+  cloudName: string;
+  uploadUrl: string;
+};
+
+/** Opens the library and returns picked assets, or [] if permission was refused. */
+export async function pickImages(limit = 3): Promise<ImagePicker.ImagePickerAsset[]> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) return [];
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsMultipleSelection: limit > 1,
+    selectionLimit: limit,
+    // Cloudinary bills on bandwidth and these are only ever shown small, so
+    // there is no reason to ship a 12MP original over mobile data.
+    quality: 0.7,
+  });
+
+  return result.canceled ? [] : result.assets;
+}
+
+/** Uploads one picked asset and resolves to its permanent https URL. */
+export async function uploadImage(
+  asset: ImagePicker.ImagePickerAsset,
+  folder: UploadFolder,
+  token: string
+): Promise<string> {
+  const sig = await api.post<Signature>('/uploads/signature', { folder }, token);
+
+  const form = new FormData();
+  // React Native's FormData takes this {uri, name, type} shape rather than a Blob.
+  form.append('file', {
+    uri: asset.uri,
+    name: asset.fileName ?? `upload-${Date.now()}.jpg`,
+    type: asset.mimeType ?? 'image/jpeg',
+  } as unknown as Blob);
+  form.append('api_key', sig.apiKey);
+  form.append('timestamp', String(sig.timestamp));
+  form.append('folder', sig.folder);
+  form.append('signature', sig.signature);
+
+  const res = await fetch(sig.uploadUrl, { method: 'POST', body: form });
+  const json = (await res.json()) as { secure_url?: string; error?: { message?: string } };
+
+  if (!res.ok || !json.secure_url) {
+    throw new Error(json.error?.message ?? 'That image could not be uploaded.');
+  }
+
+  return json.secure_url;
+}

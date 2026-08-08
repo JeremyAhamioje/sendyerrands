@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { conflict, notFound, unauthorized } from '@/lib/errors';
+import { badRequest, conflict, notFound, unauthorized } from '@/lib/errors';
 import { signToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler, validate } from '@/middleware';
@@ -289,12 +289,59 @@ adminRouter.get(
       include: {
         customer: { select: { firstName: true, lastName: true, phone: true } },
         bids: { include: { vendor: { select: { name: true } } } },
+        invitedVendors: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
 
     res.json({ data: requests });
+  })
+);
+
+/**
+ * POST /admin/requests/:id/invite — choose which vendors get to quote.
+ *
+ * Replaces the whole set rather than appending, so the dashboard's multi-select
+ * is the source of truth and unticking a vendor actually removes it.
+ *
+ * An empty list is meaningful, not a no-op: it returns the request to being
+ * open to every eligible vendor. See GET /marketplace/open-requests.
+ */
+adminRouter.post(
+  '/requests/:id/invite',
+  validate(z.object({ vendorIds: z.array(z.string().min(1)).max(50) })),
+  asyncHandler(async (req, res) => {
+    const { vendorIds } = req.body as { vendorIds: string[] };
+
+    const request = await prisma.marketplaceRequest.findUnique({
+      where: { id: req.params.id! },
+      select: { id: true, status: true },
+    });
+    if (!request) throw notFound('Request');
+
+    if (request.status !== 'OPEN') {
+      throw conflict('Bidding is closed on this request, so vendors cannot be invited.');
+    }
+
+    // Only vendors that can actually bid — inviting one that cannot would show
+    // ops a vendor on the request who will never see it.
+    const eligible = await prisma.vendor.findMany({
+      where: { id: { in: vendorIds }, canBid: true, isVerified: true },
+      select: { id: true },
+    });
+
+    if (eligible.length !== vendorIds.length) {
+      throw badRequest('One or more of those vendors is not verified or cannot bid.');
+    }
+
+    const updated = await prisma.marketplaceRequest.update({
+      where: { id: request.id },
+      data: { invitedVendors: { set: eligible.map((v) => ({ id: v.id })) } },
+      include: { invitedVendors: { select: { id: true, name: true } } },
+    });
+
+    res.json({ data: updated });
   })
 );
 

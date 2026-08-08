@@ -210,3 +210,15 @@ export function useDecideApplication() {
     },
   });
 }
+
+export function useInviteVendors() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { requestId: string; vendorIds: string[] }) =>
+      api<MarketplaceRequest>(`/admin/requests/${vars.requestId}/invite`, {
+        method: 'POST',
+        body: { vendorIds: vars.vendorIds },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['requests'] }),
+  });
+}

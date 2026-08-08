@@ -265,6 +265,7 @@ model Vendor {
   products    Product[]
   orders      Order[]
   bids        Bid[]
+  invitedTo   MarketplaceRequest[] @relation("RequestInvites")
   /// Set when this vendor was created by approving an application.
   application VendorApplication?
 
@@ -444,6 +445,10 @@ model MarketplaceRequest {
   customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   order    Order? @relation(fields: [orderId], references: [id])
   bids     Bid[]
+
+  /// Vendors ops explicitly asked to quote. Empty means every eligible vendor
+  /// sees it; once set, the open-requests feed is limited to these.
+  invitedVendors Vendor[] @relation("RequestInvites")
 
   @@index([status, closesAt])
   @@index([customerId])

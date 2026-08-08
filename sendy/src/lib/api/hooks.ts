@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { ImagePickerAsset } from 'expo-image-picker';
+
 import { useApp } from '@/store/app';
+
+import { uploadImage, type UploadFolder } from './uploads';
 
 import {
   marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorApplicationsApi, vendorsApi,
@@ -435,5 +439,39 @@ export function useApplyToSell() {
   return useMutation({
     mutationFn: (body: VendorApplicationBody) => vendorApplicationsApi.submit(body, token!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vendor-applications'] }),
+  });
+}
+
+// ── customer: marketplace requests ──────────────────────────
+
+/**
+ * Posts a request for vendors to bid on.
+ *
+ * `photoUrls` are already-uploaded Cloudinary URLs — the screen uploads while
+ * the customer is still typing, so submitting is one fast call rather than a
+ * multi-megabyte one.
+ */
+export function useCreateRequest() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      title: string;
+      details?: string;
+      quantity: number;
+      budgetKobo?: number;
+      dropoffArea: string;
+      addressId?: string;
+      photoUrls?: string[];
+      bidWindowMinutes?: number;
+    }) => marketplaceApi.createRequest(body, token!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['requests'] }),
+  });
+}
+
+export function useUploadImage(folder: UploadFolder) {
+  const { token } = useApp();
+  return useMutation({
+    mutationFn: (asset: ImagePickerAsset) => uploadImage(asset, folder, token!),
   });
 }

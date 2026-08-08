@@ -158,6 +158,9 @@ export type MarketplaceRequest = {
   createdAt: string;
   customer: { firstName: string; lastName: string; phone: string } | null;
   bids: Bid[];
+  photoUrls?: string[];
+  /** Vendors ops asked to quote. Empty means the request is open to all. */
+  invitedVendors: { id: string; name: string }[];
 };
 
 export type Vendor = {
