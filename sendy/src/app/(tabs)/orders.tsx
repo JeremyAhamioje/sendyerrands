@@ -6,6 +6,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Badge, Card, EmptyState, Skeleton } from '@/components/ui/atoms';
 import { Button } from '@/components/ui/Button';
 import { Screen, Segmented } from '@/components/ui/Screen';
+import { QueryError } from '@/components/ui/QueryError';
 import { Thumb } from '@/components/ui/Thumb';
 import { useOrders } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
@@ -16,7 +17,7 @@ import { colors } from '@/lib/theme';
 export default function Orders() {
   const router = useRouter();
   const [tab, setTab] = useState('Active');
-  const { data: orders = [], isLoading, isError, refetch } = useOrders(
+  const { data: orders = [], isLoading, isError, error, refetch } = useOrders(
     tab === 'Active' ? 'active' : 'history'
   );
 
@@ -34,13 +35,7 @@ export default function Orders() {
         {isLoading ? (
           [0, 1, 2].map((i) => <Skeleton key={i} className="w-full h-[132px] mb-3" />)
         ) : isError ? (
-          <EmptyState
-            icon="cloud-offline-outline"
-            title="Can't load your orders"
-            body="Check your connection and try again."
-          >
-            <Button title="Retry" fullWidth={false} onPress={() => refetch()} />
-          </EmptyState>
+          <QueryError error={error} onRetry={() => refetch()} noun="your orders" />
         ) : list.length ? (
           list.map((order) => <OrderRow key={order.id} order={order} router={router} />)
         ) : (

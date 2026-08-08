@@ -7,6 +7,7 @@ import { MenuItemRow } from '@/components/ProductCard';
 import { Chip, EmptyState, Skeleton, Verified } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Screen, StickyBar } from '@/components/ui/Screen';
+import { QueryError } from '@/components/ui/QueryError';
 import { Thumb } from '@/components/ui/Thumb';
 import { useVendor } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
@@ -18,7 +19,7 @@ export default function VendorDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { addToCart, cartCount, subtotal, setVendorFees } = useApp();
-  const { data, isLoading, isError, refetch } = useVendor(id);
+  const { data, isLoading, isError, error, refetch } = useVendor(id);
   const [section, setSection] = useState<string | null>(null);
 
   const vendor = data?.vendor;
@@ -49,13 +50,7 @@ export default function VendorDetail() {
         </View>
         {isError ? (
           <View className="px-4">
-            <EmptyState
-              icon="cloud-offline-outline"
-              title="Can't load this vendor"
-              body="Check your connection and try again."
-            >
-              <Button title="Retry" fullWidth={false} onPress={() => refetch()} />
-            </EmptyState>
+            <QueryError error={error} onRetry={() => refetch()} noun="this vendor" />
           </View>
         ) : null}
       </Screen>

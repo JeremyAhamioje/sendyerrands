@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { QueryError } from '@/components/ui/QueryError';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -19,7 +20,7 @@ import { useApp } from '@/store/app';
 export default function Home() {
   const router = useRouter();
   const { activeAddress } = useApp();
-  const { data: vendors = [], isLoading, isError, refetch } = useVendors();
+  const { data: vendors = [], isLoading, isError, error, refetch } = useVendors();
 
   const openVendor = (id: string) =>
     router.push({ pathname: '/vendor/[id]', params: { id } });
@@ -123,13 +124,7 @@ export default function Home() {
           <Text className="text-ink text-[20px] font-bold mb-4">All vendors nearby</Text>
 
           {isError ? (
-            <EmptyState
-              icon="cloud-offline-outline"
-              title="Can't load vendors"
-              body="Check your connection and try again — nothing has been lost."
-            >
-              <Button title="Retry" fullWidth={false} onPress={() => refetch()} />
-            </EmptyState>
+            <QueryError error={error} onRetry={() => refetch()} noun="vendors" />
           ) : isLoading ? (
             [0, 1, 2].map((i) => <Skeleton key={i} className="w-full h-[236px] mb-5" />)
           ) : vendors.length === 0 ? (

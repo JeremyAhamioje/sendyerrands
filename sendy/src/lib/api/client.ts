@@ -48,6 +48,19 @@ export class ApiError extends Error {
   get isAuthError() {
     return this.status === 401;
   }
+
+  /**
+   * True when the request was rejected because of who is signed in, rather than
+   * anything to do with the network.
+   *
+   * 403 means the token is valid but belongs to the wrong kind of account — a
+   * rider token on a customer endpoint, say. Retrying can never fix either
+   * case, so screens must offer signing in again instead of a Retry button
+   * that will fail identically every time.
+   */
+  get needsSignIn() {
+    return this.status === 401 || this.status === 403;
+  }
 }
 
 type RequestOptions = {
