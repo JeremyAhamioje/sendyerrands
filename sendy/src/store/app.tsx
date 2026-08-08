@@ -30,8 +30,8 @@ type AppState = {
   token: string | null;
   signedIn: boolean;
   user: ApiUser | null;
-  actor: 'customer' | 'rider';
-  signIn: (token: string, actor?: 'customer' | 'rider') => Promise<void>;
+  actor: 'customer' | 'rider' | 'vendor';
+  signIn: (token: string, actor?: 'customer' | 'rider' | 'vendor') => Promise<void>;
   signOut: () => Promise<void>;
   phoneNumber: string;
   setPhoneNumber: (v: string) => void;
@@ -64,7 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [actor, setActor] = useState<'customer' | 'rider'>('customer');
+  const [actor, setActor] = useState<'customer' | 'rider' | 'vendor'>('customer');
   const [phoneNumber, setPhoneNumber] = useState('');
 
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -110,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const signIn = useCallback(
-    async (newToken: string, newActor: 'customer' | 'rider' = 'customer') => {
+    async (newToken: string, newActor: 'customer' | 'rider' | 'vendor' = 'customer') => {
       await saveSession({ token: newToken, actor: newActor });
       setToken(newToken);
       setActor(newActor);

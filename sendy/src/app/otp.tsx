@@ -17,6 +17,8 @@ export default function OtpScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams<{ role?: string }>();
   const asRider = role === 'rider';
+  const asVendor = role === 'vendor';
+  const authRole = asRider ? 'rider' : asVendor ? 'vendor' : 'customer';
 
   const { phoneNumber, signIn } = useApp();
   const [code, setCode] = useState('');
@@ -31,7 +33,7 @@ export default function OtpScreen() {
 
   const verify = useMutation({
     mutationFn: () =>
-      authApi.verifyOtp({ phone: phoneNumber, code, role: asRider ? 'rider' : 'customer' }),
+      authApi.verifyOtp({ phone: phoneNumber, code, role: authRole }),
     onSuccess: async (session) => {
       // A phone with no account yet gets sent to profile setup, which verifies
       // again with a name attached. The code stays valid for that second call.
@@ -45,11 +47,10 @@ export default function OtpScreen() {
 
       // The token's actor has to match what the API issued, or every panel in
       // the destination app 403s.
-      await signIn(session.token, asRider ? 'rider' : 'customer');
+      await signIn(session.token, authRole);
 
+      if (asVendor) return router.replace('/vendor-app');
       if (!asRider) return router.replace('/(tabs)/home');
-      // A rider who hasn't cleared verification can't take jobs, so send them
-      // to finish that rather than to a board they can only look at.
       /**
        * Always the dashboard, approved or not.
        *
@@ -69,7 +70,7 @@ export default function OtpScreen() {
   });
 
   const resend = useMutation({
-    mutationFn: () => authApi.requestOtp(phoneNumber),
+    mutationFn: () => authApi.requestOtp(phoneNumber, authRole),
     onSuccess: () => {
       setSeconds(42);
       setError(null);

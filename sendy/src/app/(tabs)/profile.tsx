@@ -117,6 +117,14 @@ export default function Profile() {
             label="Become a vendor"
             onPress={() => router.push('/become-vendor')}
           />
+          {/* Shown to everyone rather than gated on being a vendor: the app has
+              no way to know until it tries, and the vendor gate explains itself
+              to anyone who is not one. */}
+          <ListRow
+            icon="business-outline"
+            label="Vendor dashboard"
+            onPress={() => router.push('/vendor-app')}
+          />
           <ListRow icon="help-buoy-outline" label="Help & support" onPress={() => router.push('/help')} />
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>

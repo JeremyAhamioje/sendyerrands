@@ -26,6 +26,10 @@ export default function PhoneScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams<{ role?: string }>();
   const asRider = role === 'rider';
+  const asVendor = role === 'vendor';
+  // The API mints a different kind of token per role, so this has to travel
+  // all the way from the entry point to the verify call.
+  const authRole = asRider ? 'rider' : asVendor ? 'vendor' : 'customer';
 
   const { setPhoneNumber } = useApp();
   const [digits, setDigits] = useState('803 123 4567');
@@ -35,10 +39,10 @@ export default function PhoneScreen() {
   const valid = digits.replace(/\D/g, '').length >= 10;
 
   const sendCode = useMutation({
-    mutationFn: () => authApi.requestOtp(digits, asRider ? 'rider' : 'customer'),
+    mutationFn: () => authApi.requestOtp(digits, authRole),
     onSuccess: () => {
       setPhoneNumber(digits);
-      router.push({ pathname: '/otp', params: asRider ? { role: 'rider' } : {} });
+      router.push({ pathname: '/otp', params: role ? { role } : {} });
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not send the code.'),
   });

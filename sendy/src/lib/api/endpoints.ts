@@ -13,6 +13,7 @@ export type Session = {
   isNewAccount: boolean;
   user?: ApiUser;
   rider?: ApiRider;
+  vendor?: ApiVendorSession;
   needsProfile?: boolean;
 };
 
@@ -27,24 +28,32 @@ export type ApiRider = {
   isOnline: boolean; rating?: number;
 };
 
+export type ApiVendorSession = {
+  id: string; name: string; slug: string; phone: string | null;
+  isVerified: boolean; isOpen: boolean;
+};
+
 export type ApiAddress = {
   id: string; label: string; line1: string; line2: string | null;
   city: string; landmark: string | null; contact: string; phone: string; isDefault: boolean;
 };
 
 export const authApi = {
-  requestOtp: (phone: string, role: 'customer' | 'rider' = 'customer') =>
+  requestOtp: (phone: string, role: 'customer' | 'rider' | 'vendor' = 'customer') =>
     api.post<OtpRequestResult>('/auth/otp/request', { phone, role }),
 
   verifyOtp: (input: {
-    phone: string; code: string; role?: 'customer' | 'rider';
+    phone: string; code: string; role?: 'customer' | 'rider' | 'vendor';
     firstName?: string; lastName?: string; email?: string; referredByCode?: string;
     vehicleType?: 'MOTORBIKE' | 'BICYCLE' | 'TRICYCLE' | 'CAR' | 'VAN' | 'FOOT';
     plateNumber?: string;
   }) => api.post<Session>('/auth/otp/verify', input),
 
   session: (token: string) =>
-    api.get<{ actor: 'customer' | 'rider'; user?: ApiUser; rider?: ApiRider }>('/auth/session', token),
+    api.get<{ actor: 'customer' | 'rider' | 'vendor'; user?: ApiUser; rider?: ApiRider; vendor?: ApiVendorSession }>(
+      '/auth/session',
+      token
+    ),
 };
 
 // ── customer ────────────────────────────────────────────────
@@ -215,4 +224,82 @@ export const uploadsApi = {
       { folder },
       token
     ),
+};
+
+// ── vendor ──────────────────────────────────────────────────
+export type ApiVendorProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  priceKobo: number;
+  section: string | null;
+  badge: string | null;
+  imageUrl: string | null;
+  isMarketplace: boolean;
+  inStock: boolean;
+  _count: { orderItems: number };
+};
+
+export type VendorProductBody = {
+  name: string;
+  description?: string;
+  priceKobo: number;
+  section?: string;
+  imageUrl?: string;
+  isMarketplace?: boolean;
+  inStock?: boolean;
+};
+
+export type ApiVendorMe = {
+  id: string;
+  name: string;
+  slug: string;
+  phone: string | null;
+  area: string | null;
+  isVerified: boolean;
+  isOpen: boolean;
+  rating: number;
+  _count: { products: number; orders: number };
+  today: { salesKobo: number; orders: number };
+  awaitingAcceptance: number;
+};
+
+export const vendorApi = {
+  me: (token: string) => api.get<ApiVendorMe>('/vendor/me', token),
+
+  setOpen: (isOpen: boolean, token: string) =>
+    api.patch<{ id: string; isOpen: boolean }>('/vendor/me', { isOpen }, token),
+
+  products: (token: string) => api.get<ApiVendorProduct[]>('/vendor/products', token),
+
+  createProduct: (body: VendorProductBody, token: string) =>
+    api.post<ApiVendorProduct>('/vendor/products', body, token),
+
+  updateProduct: (id: string, body: Partial<VendorProductBody>, token: string) =>
+    api.patch<ApiVendorProduct>(`/vendor/products/${id}`, body, token),
+
+  deleteProduct: (id: string, token: string) =>
+    api.del<{ id: string; name: string }>(`/vendor/products/${id}`, token),
+
+  orders: (status: 'new' | 'active' | 'history' | 'all', token: string) =>
+    api.get<ApiVendorOrder[]>(`/vendor/orders?status=${status}`, token),
+
+  acceptOrder: (id: string, token: string) =>
+    api.post<ApiOrder>(`/vendor/orders/${id}/accept`, {}, token),
+
+  rejectOrder: (id: string, reason: string | undefined, token: string) =>
+    api.post<ApiOrder>(`/vendor/orders/${id}/reject`, { reason }, token),
+};
+
+export type ApiVendorOrder = {
+  id: string;
+  reference: string;
+  status: string;
+  subtotalKobo: number;
+  totalKobo: number;
+  createdAt: string;
+  items: { id: string; name: string; quantity: number; unitPriceKobo: number; note: string | null }[];
+  customer: { firstName: string; lastName: string; phone: string } | null;
+  address: { line1: string; city: string; landmark: string | null } | null;
+  rider: { firstName: string; lastName: string; phone: string } | null;
 };

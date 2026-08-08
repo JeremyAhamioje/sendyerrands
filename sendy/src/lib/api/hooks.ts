@@ -7,8 +7,9 @@ import { useApp } from '@/store/app';
 import { uploadImage, type UploadFolder } from './uploads';
 
 import {
-  marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorApplicationsApi, vendorsApi,
+  marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorApi, vendorApplicationsApi, vendorsApi,
 } from './endpoints';
+import type { VendorProductBody } from './endpoints';
 import type { VendorApplicationBody } from './endpoints';
 import {
   koboToNaira, toBid, toMenuItem, toOrder, toProduct, toRiderJob, toVendor,
@@ -542,5 +543,91 @@ export function useToggleFavourite() {
 
     // Saving needs the vendor row the list renders, and only the server has it.
     onSettled: () => qc.invalidateQueries({ queryKey: ['favourites'] }),
+  });
+}
+
+// ── vendor ──────────────────────────────────────────────────
+
+export function useVendorMe() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['vendor-me'],
+    queryFn: () => vendorApi.me(token!),
+    enabled: Boolean(token),
+  });
+}
+
+export function useSetVendorOpen() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (isOpen: boolean) => vendorApi.setOpen(isOpen, token!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendor-me'] }),
+  });
+}
+
+export function useVendorProducts() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['vendor-products'],
+    queryFn: () => vendorApi.products(token!),
+    enabled: Boolean(token),
+  });
+}
+
+/** Every catalogue write refreshes the list and the dashboard's product count. */
+function useVendorProductMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor-products'] });
+      qc.invalidateQueries({ queryKey: ['vendor-me'] });
+    },
+  });
+}
+
+export function useCreateVendorProduct() {
+  const { token } = useApp();
+  return useVendorProductMutation((body: VendorProductBody) =>
+    vendorApi.createProduct(body, token!)
+  );
+}
+
+export function useUpdateVendorProduct() {
+  const { token } = useApp();
+  return useVendorProductMutation((vars: { id: string; patch: Partial<VendorProductBody> }) =>
+    vendorApi.updateProduct(vars.id, vars.patch, token!)
+  );
+}
+
+export function useDeleteVendorProduct() {
+  const { token } = useApp();
+  return useVendorProductMutation((id: string) => vendorApi.deleteProduct(id, token!));
+}
+
+export function useVendorOrders(status: 'new' | 'active' | 'history' | 'all' = 'new') {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['vendor-orders', status],
+    queryFn: () => vendorApi.orders(status, token!),
+    enabled: Boolean(token),
+    // A vendor watches this screen while cooking; a stale queue costs an order.
+    refetchInterval: 20_000,
+  });
+}
+
+export function useRespondToOrder() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; accept: boolean; reason?: string }) =>
+      vars.accept
+        ? vendorApi.acceptOrder(vars.id, token!)
+        : vendorApi.rejectOrder(vars.id, vars.reason, token!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendor-orders'] });
+      qc.invalidateQueries({ queryKey: ['vendor-me'] });
+    },
   });
 }

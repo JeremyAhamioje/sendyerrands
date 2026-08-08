@@ -36,7 +36,7 @@ async function deleteItem(key: string) {
   await SecureStore.deleteItemAsync(key);
 }
 
-export type StoredSession = { token: string; actor: 'customer' | 'rider' };
+export type StoredSession = { token: string; actor: 'customer' | 'rider' | 'vendor' };
 
 export async function saveSession(session: StoredSession) {
   await Promise.all([setItem(TOKEN_KEY, session.token), setItem(ACTOR_KEY, session.actor)]);
