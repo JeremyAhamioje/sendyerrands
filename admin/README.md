@@ -19,17 +19,24 @@ when it creates the account and stores only a bcrypt hash.
 Lost it? It cannot be recovered, and re-running the seed will not reset it (the
 upsert deliberately leaves an existing password alone). Set a new one:
 
-```powershell
+```bash
 cd ../api
-$env:ADMIN_EMAIL = "admin@sendy.ng"
-$env:ADMIN_PASSWORD = Read-Host "New admin password"   # 12 chars minimum
 npm run admin:password
-Remove-Item Env:ADMIN_PASSWORD
 ```
 
-`Read-Host` prompts instead of taking the password on the command line, which
-PSReadLine would otherwise write to `ConsoleHost_history.txt`. Prefix the run
-with a `DATABASE_URL` to target the deployed database rather than your local one.
+It prompts for the email (defaulting to `admin@sendy.ng`) and then for the
+password twice, with the typing hidden. Minimum 12 characters — this account can
+refund money and the dashboard is on a public URL.
+
+Nothing secret goes on the command line, so there is no shell history to worry
+about and no cross-platform quoting to get wrong. `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` still work as environment variables for non-interactive use;
+set `DATABASE_URL` too if you need to target a database other than the one in
+`.env`.
+
+The change takes effect immediately — no redeploy of this dashboard and no
+restart of the API, since the hash is read from the database per request.
+Existing sessions are unaffected: their JWTs stay valid until they expire.
 
 > **Port 5180, not Vite's default 5173.** 5173 collides with other projects on
 > this machine, and `strictPort` is on so a clash fails loudly instead of
