@@ -12,9 +12,24 @@ npm run dev          # http://localhost:5180
 The API must be running on `http://localhost:4000` (`cd ../api && npm run dev`).
 Point elsewhere with `VITE_API_URL` in `.env`.
 
-Sign in with the admin the API seed created. Its password is **not** in this
-repo — the seed prints it once when it creates the account, or you set it
-yourself with `SEED_ADMIN_PASSWORD` before running `npm run db:seed`.
+Sign in with the admin the API seed created — `admin@sendy.ng` unless you set
+`SEED_ADMIN_EMAIL`. Its password is **not** in this repo: the seed prints it once
+when it creates the account and stores only a bcrypt hash.
+
+Lost it? It cannot be recovered, and re-running the seed will not reset it (the
+upsert deliberately leaves an existing password alone). Set a new one:
+
+```powershell
+cd ../api
+$env:ADMIN_EMAIL = "admin@sendy.ng"
+$env:ADMIN_PASSWORD = Read-Host "New admin password"   # 12 chars minimum
+npm run admin:password
+Remove-Item Env:ADMIN_PASSWORD
+```
+
+`Read-Host` prompts instead of taking the password on the command line, which
+PSReadLine would otherwise write to `ConsoleHost_history.txt`. Prefix the run
+with a `DATABASE_URL` to target the deployed database rather than your local one.
 
 > **Port 5180, not Vite's default 5173.** 5173 collides with other projects on
 > this machine, and `strictPort` is on so a clash fails loudly instead of

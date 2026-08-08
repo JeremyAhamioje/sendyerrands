@@ -10,12 +10,22 @@
  * arguments land in shell history and in the process list, where any other user
  * on the machine can read them.
  *
- *   ADMIN_EMAIL=admin@sendy.ng ADMIN_PASSWORD='...' npm run admin:password
+ * PowerShell — prompt for the password rather than typing it on the command
+ * line, which PSReadLine would write to ConsoleHost_history.txt on disk:
  *
- * Add DATABASE_URL inline to target a deployed database instead of .env:
+ *   $env:ADMIN_EMAIL = "admin@sendy.ng"
+ *   $env:ADMIN_PASSWORD = Read-Host "New admin password"
+ *   npm run admin:password
+ *   Remove-Item Env:ADMIN_PASSWORD
  *
- *   DATABASE_URL='postgresql://…pooler…:6543/postgres?pgbouncer=true' \
- *     ADMIN_EMAIL=admin@sendy.ng ADMIN_PASSWORD='...' npm run admin:password
+ * bash / zsh — a leading space keeps the line out of history when HISTCONTROL
+ * includes ignorespace:
+ *
+ *    ADMIN_EMAIL=admin@sendy.ng ADMIN_PASSWORD='…' npm run admin:password
+ *
+ * Set DATABASE_URL the same way to target a deployed database instead of .env.
+ * Note that the pooler URL needs ?pgbouncer=true, and that quoting matters in
+ * PowerShell because & and ? are parsed from a bare string.
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -30,10 +40,18 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD;
 
   if (!email || !password) {
-    console.error(
-      '\n✗ Both ADMIN_EMAIL and ADMIN_PASSWORD must be set.\n\n' +
-        "  ADMIN_EMAIL=admin@sendy.ng ADMIN_PASSWORD='…' npm run admin:password\n"
-    );
+    // Shown for the shell actually in use — the syntax is not portable, and a
+    // bash example on PowerShell reads as "not recognized as the name of a
+    // cmdlet", which says nothing about what to do instead.
+    const example =
+      process.platform === 'win32'
+        ? '  $env:ADMIN_EMAIL = "admin@sendy.ng"\n' +
+          '  $env:ADMIN_PASSWORD = Read-Host "New admin password"\n' +
+          '  npm run admin:password\n' +
+          '  Remove-Item Env:ADMIN_PASSWORD\n'
+        : "  ADMIN_EMAIL=admin@sendy.ng ADMIN_PASSWORD='…' npm run admin:password\n";
+
+    console.error(`\n✗ Both ADMIN_EMAIL and ADMIN_PASSWORD must be set.\n\n${example}`);
     process.exit(1);
   }
 
