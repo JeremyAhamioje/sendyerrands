@@ -475,3 +475,19 @@ export function useUploadImage(folder: UploadFolder) {
     mutationFn: (asset: ImagePickerAsset) => uploadImage(asset, folder, token!),
   });
 }
+
+/**
+ * The jobs this rider accepted, active or finished.
+ *
+ * `useRiderJobs` is the open board of unclaimed work — a different list. A
+ * rider had no way to see their own deliveries: accepting removed a job from
+ * the board, and delivering removed it from everywhere.
+ */
+export function useRiderOrders(status: 'active' | 'completed' | 'all' = 'active') {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['rider-orders', status],
+    queryFn: async () => (await riderApi.orders(status, token!)).map(toRiderJob),
+    enabled: Boolean(token),
+  });
+}

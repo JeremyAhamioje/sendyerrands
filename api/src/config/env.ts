@@ -24,6 +24,9 @@ const schema = z.object({
   OTP_DEV_MODE: z.string().optional(),
   OTP_DEV_CODE: z.string().default('123456'),
 
+  /** Codes per 15 minutes. Unset means 5 in production, 100 in development. */
+  OTP_RATE_LIMIT_MAX: z.coerce.number().int().min(1).optional(),
+
   // Which channel carries the OTP. See services/otp-delivery.ts.
   OTP_CHANNEL: z.enum(['auto', 'whatsapp', 'sms']).default('auto'),
 

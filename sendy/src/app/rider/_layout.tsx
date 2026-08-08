@@ -90,6 +90,15 @@ export default function RiderTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="deliveries"
+        options={{
+          title: 'Deliveries',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'bicycle' : 'bicycle-outline'} size={23} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="earnings"
         options={{
           title: 'Earnings',

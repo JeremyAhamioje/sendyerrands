@@ -97,6 +97,48 @@ riderRouter.get(
   })
 );
 
+/**
+ * GET /rider/orders?status=active|completed — the jobs THIS rider took.
+ *
+ * Distinct from /rider/jobs, which is the open board of unclaimed work, and
+ * from /rider/active, which returns a single in-progress order. Neither gave a
+ * rider any way to see what they had accepted: a job vanished from the board on
+ * accept and disappeared entirely once delivered, so there was no list of
+ * received orders and no history to check a payout against.
+ */
+riderRouter.get(
+  '/orders',
+  asyncHandler(async (req, res) => {
+    const filter = String(req.query.status ?? 'all');
+
+    const ACTIVE = ['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] as const;
+    const DONE = ['DELIVERED', 'CANCELLED', 'REFUNDED'] as const;
+
+    const orders = await prisma.order.findMany({
+      where: {
+        riderId: req.auth!.id,
+        ...(filter === 'active'
+          ? { status: { in: [...ACTIVE] } }
+          : filter === 'completed'
+            ? { status: { in: [...DONE] } }
+            : {}),
+      },
+      include: {
+        vendor: { select: { name: true, area: true } },
+        address: { select: { line1: true, city: true, landmark: true } },
+        errandDetail: { select: { task: true, pickupName: true, pickupAddress: true } },
+        packageDetail: { select: { pickupName: true, pickupAddress: true, dropoffName: true, dropoffAddress: true, size: true } },
+      },
+      // Active work first and oldest-first within it, so the job a customer has
+      // been waiting longest for is the one at the top.
+      orderBy: [{ status: 'asc' }, { assignedAt: 'desc' }],
+      take: 50,
+    });
+
+    res.json({ data: orders });
+  })
+);
+
 /** GET /rider/jobs/:id */
 riderRouter.get(
   '/jobs/:id',

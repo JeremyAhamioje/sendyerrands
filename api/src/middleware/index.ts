@@ -29,13 +29,28 @@ function fieldErrors(error: ZodError) {
   }, {});
 }
 
-/** Tight limit on OTP endpoints — this is the SMS-cost and brute-force surface. */
+/**
+ * Tight limit on OTP endpoints — this is the SMS-cost and brute-force surface.
+ *
+ * Scaled by environment rather than fixed. Five codes per quarter hour is the
+ * right ceiling when each one costs money and an attacker is guessing at a real
+ * account; it is the wrong ceiling when one person is signing in and out as a
+ * customer, then a rider, then a customer again to test a flow, and gets locked
+ * out of their own build for fifteen minutes. Production keeps the strict
+ * number — this is a development allowance, not a relaxation of the rule.
+ *
+ * Override with OTP_RATE_LIMIT_MAX when a specific test needs something else.
+ */
+const otpMax = env.OTP_RATE_LIMIT_MAX ?? (env.isProd ? 5 : 100);
+
 export const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: otpMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many code requests. Try again in a few minutes.' } },
+  message: {
+    error: { code: 'TOO_MANY_REQUESTS', message: 'Too many code requests. Try again in a few minutes.' },
+  },
 });
 
 export const apiLimiter = rateLimit({

@@ -182,6 +182,10 @@ export const riderApi = {
 
   active: (token: string) => api.get<(ApiRiderJob & ApiOrder) | null>('/rider/active', token),
 
+  /** Jobs this rider accepted — the open board is `jobs` above. */
+  orders: (status: 'active' | 'completed' | 'all', token: string) =>
+    api.get<ApiRiderJob[]>(`/rider/orders?status=${status}`, token),
+
   updateStatus: (
     id: string,
     body: { status: 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED'; deliveryCode?: string; proofUrl?: string },
