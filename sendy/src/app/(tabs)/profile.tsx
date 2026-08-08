@@ -117,7 +117,7 @@ export default function Profile() {
             label="Become a vendor"
             onPress={() => router.push('/become-vendor')}
           />
-          <ListRow icon="help-buoy-outline" label="Help & support" onPress={() => router.push('/(tabs)/support')} />
+          <ListRow icon="help-buoy-outline" label="Help & support" onPress={() => router.push('/help')} />
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>
 

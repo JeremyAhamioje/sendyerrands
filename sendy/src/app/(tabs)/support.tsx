@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Badge, Card, Divider } from '@/components/ui/atoms';
 import { Screen } from '@/components/ui/Screen';
@@ -8,7 +9,10 @@ import { FAQS } from '@/lib/mock';
 import { colors, shadow } from '@/lib/theme';
 
 /** Support (design.md §10) — contact channels, open tickets, FAQ. */
+const SUPPORT_PHONE = '+2347007363900';
+
 export default function Support() {
+  const router = useRouter();
   const [open, setOpen] = useState<string | null>(FAQS[0].q);
 
   return (
@@ -23,9 +27,20 @@ export default function Support() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
         {/* channels */}
         <View className="flex-row mb-4">
-          <Channel icon="chatbubble-ellipses" label="Live chat" hint="~3 min" primary />
+          <Channel
+            icon="logo-whatsapp"
+            label="WhatsApp"
+            hint="Fastest"
+            primary
+            onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_PHONE.replace(/[^0-9]/g, '')}`)}
+          />
           <View className="w-3" />
-          <Channel icon="call" label="Call us" hint="0700 736 39" />
+          <Channel
+            icon="call"
+            label="Call us"
+            hint="7am–11pm"
+            onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}
+          />
         </View>
 
         {/* open ticket */}
@@ -79,7 +94,11 @@ export default function Support() {
           })}
         </Card>
 
-        <Pressable accessibilityRole="button" className="flex-row items-center justify-center mt-6 py-3">
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/help')}
+          className="flex-row items-center justify-center mt-6 py-3"
+        >
           <Ionicons name="document-text-outline" size={16} color={colors.pink[600]} />
           <Text className="text-pink-600 text-[15px] font-semibold ml-2">Read the help centre</Text>
         </Pressable>
@@ -92,15 +111,18 @@ function Channel({
   icon,
   label,
   hint,
+  onPress,
   primary = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   hint: string;
+  onPress: () => void;
   primary?: boolean;
 }) {
   return (
     <Pressable
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       style={shadow.card}
