@@ -1,23 +1,49 @@
-# Sendy — Phase 1 MVP (UI build)
+# Sendy — Phase 1 MVP
 
-Cross-platform customer + rider app for the Sendy logistics / errands / delivery
-platform. Built to `design.md` (the design system) and the Phase 1 MVP scope in
-the proposal.
+Cross-platform customer **and** rider app for the Sendy logistics / errands /
+delivery platform. Built to `design.md` (the design system) and the Phase 1 MVP
+scope in the proposal.
 
-**Status: Chunk 1 complete — all UI frames built, no backend yet.**
-Every screen runs on mock data from `src/lib/mock.ts`.
+**Status: wired to the live API.** The customer flows (browse → cart → checkout
+→ track) and the rider loop (sign-in → job list → accept → deliver) run against
+real data.
+
+`src/lib/mock.ts` still holds the domain **types** every screen imports, plus
+static presentation content that was never server-owned: `PROMOS`, `CATEGORIES`,
+`FAQS`, `SEARCH_SUGGESTIONS`, `PARCEL_SIZES`, `PARCEL_TYPES`. Its bulk fixtures
+(`VENDORS`, `MENU`, `PRODUCTS`, `ORDERS`, `BIDS`, `RIDER_JOBS`, `EARNINGS`,
+`ADDRESSES`) are now dead — nothing imports them since `lib/api/mappers.ts`
+started shaping API responses into the same types. They're kept for now as
+reference for the fields each screen expects; delete them once the remaining
+unwired screens (`marketplace/post-request.tsx`, `rider-verify.tsx`) are done.
 
 ---
 
 ## Run it
 
+The app needs the API. Start that first, in its own terminal:
+
 ```bash
-npm install
-npx expo start
+cd ../api && npm run dev     # http://localhost:4000
 ```
 
-Scan the QR code with **Expo Go** on your phone — no Mac, emulator or Android
-Studio needed. `npx expo start --web` opens it in a browser instead.
+Then:
+
+```bash
+npm install
+npx expo start               # http://localhost:8081
+```
+
+From the Expo prompt, **press `w`** for the browser, or scan the QR code with
+**Expo Go** on your phone — no Mac, emulator or Android Studio needed.
+
+The API base URL is resolved at runtime, so a phone on the same Wi-Fi needs no
+configuration: `src/lib/api/client.ts` derives your LAN IP from the Expo host
+URI. Override it with `EXPO_PUBLIC_API_URL` for standalone builds, which have no
+host URI to derive from. See the [root README](../README.md#how-the-app-finds-the-api).
+
+To reach the rider app, sign in via `/phone?role=rider` — the same binary serves
+both roles, keyed off the `actor` claim in the JWT.
 
 - Node 22.13+ required (Expo SDK 57).
 - Type check: `npx tsc --noEmit`
