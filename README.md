@@ -219,3 +219,54 @@ the port on a direct URL fails authentication.
 `OTP_DEV_MODE` accepts a fixed OTP instead of sending one. It resolves to **on in
 development, off in production** when unset, and should never be `true` against a
 public deployment — it lets anyone sign in as any phone number.
+
+---
+
+## Building the Android demo APK
+
+No Google Play account and no fee — an APK installs directly on any Android
+phone. Uses EAS Build's free tier.
+
+```bash
+cd sendy
+npx eas login              # free Expo account
+npx eas build:configure    # once — writes extra.eas.projectId into app.json
+npx eas build --profile preview --platform android
+```
+
+EAS prints a URL when the build finishes. Send that link to a tester, or hand
+them the `.apk`; Android will ask them to allow installs from unknown sources.
+
+The `preview` profile builds an APK rather than an app bundle (a bundle only
+installs through Play) and bakes in `EXPO_PUBLIC_API_URL`, so the app talks to
+the live API rather than your laptop. **That URL is compiled in** — pointing the
+app somewhere else means a new build.
+
+`expo-updates` is installed and `preview` publishes to its own channel, so a
+JavaScript fix reaches installed testers without rebuilding:
+
+```bash
+npx eas update --branch preview --message "fix the thing"
+```
+
+Native changes — a new package with native code, an icon, anything in app.json
+— still need a fresh build. `runtimeVersion` is tied to the app version so an
+incompatible update cannot be delivered to a binary that can't run it.
+
+### Before you demo
+
+**Wake the API.** Render's free tier sleeps after ~15 minutes idle and takes
+30–60 seconds to come back. Open
+[the health endpoint](https://sendyerrands.onrender.com/health) a minute
+beforehand. For real users this is not acceptable — Render Starter ($7/month)
+never sleeps, and it is the cheapest thing that makes this feel like a product.
+Supabase is unaffected: its free tier pauses after seven days of inactivity,
+not fifteen minutes.
+
+**Check sign-in works.** `OTP_DEV_MODE=true` on Render makes every number
+accept `123456`, which is how the demo accounts above are meant to be used.
+
+> ⚠️ While `OTP_DEV_MODE` is on, anyone who finds the API URL can sign in as any
+> phone number. That is fine against seeded demo data and unacceptable the day
+> real customers exist. Set it back to `false` before launch — the code already
+> defaults to off in production, so this is only ever on because someone set it.
