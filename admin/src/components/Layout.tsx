@@ -23,10 +23,22 @@ export function Layout() {
     <div className="flex min-h-screen">
       <aside className="flex w-60 flex-none flex-col border-r border-hairline bg-white">
         <div className="flex items-center gap-2.5 px-5 py-5">
-          {/* Imported rather than referenced from /public so Vite fingerprints
-              it — an ops tool left open all day should not serve a stale logo
-              from cache after a rebrand. */}
-          <img src={logo} alt="Sendy" className="h-8 w-8 rounded-lg object-contain" />
+          {/*
+            The logo sits on brand pink, not on the white sidebar.
+
+            logo.png is a near-white line drawing — 95% of its visible pixels
+            have luminance above 240, on a 63%-transparent background. Placed
+            directly on white it renders perfectly and is invisible, which reads
+            as a broken image rather than a contrast problem. Pink is the
+            background it was drawn for.
+
+            Imported rather than served from /public so Vite fingerprints it: an
+            ops tool left open all day should not keep a stale logo after a
+            rebrand.
+          */}
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-pink-600 p-1">
+            <img src={logo} alt="Sendy" className="h-full w-full object-contain" />
+          </div>
           <div>
             <p className="text-sm font-bold leading-tight text-ink">Sendy</p>
             <p className="text-[11px] leading-tight text-muted">Operations</p>
