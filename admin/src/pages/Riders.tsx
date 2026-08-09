@@ -40,7 +40,7 @@ export function Riders() {
         subtitle="Verify documents before a rider can accept jobs. Approving unlocks the rider app."
       />
 
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="mb-4 flex flex-wrap gap-1.5">
           {TABS.map((t) => (
             <button
@@ -66,7 +66,8 @@ export function Riders() {
               hint={tab === 'IN_REVIEW' ? 'No riders are waiting for review.' : undefined}
             />
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[46rem] text-sm">
               <thead>
                 <tr className="border-b border-hairline text-left text-[12px] uppercase tracking-wide text-muted">
                   <th className="px-5 py-3 font-semibold">Rider</th>
@@ -120,7 +121,8 @@ export function Riders() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </Card>
       </div>

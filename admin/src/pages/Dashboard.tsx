@@ -19,7 +19,7 @@ export function Dashboard() {
     <>
       <PageHeader title="Dashboard" subtitle="Today at a glance. Refreshes every 30 seconds." />
 
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {stats.isLoading ? (
           <Loading />
         ) : stats.isError ? (
@@ -58,7 +58,8 @@ export function Dashboard() {
                 Nothing in flight right now.
               </p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[46rem] text-sm">
                 <thead>
                   <tr className="border-b border-hairline text-left text-[12px] uppercase tracking-wide text-muted">
                     <th className="px-5 py-3 font-semibold">Reference</th>
@@ -100,7 +101,8 @@ export function Dashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </Card>
         </div>

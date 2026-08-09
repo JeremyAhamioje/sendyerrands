@@ -51,7 +51,7 @@ export function Vendors() {
         subtitle="Verify a vendor, let it bid on marketplace requests, take it offline, or manage its listings."
       />
 
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {failure ? (
           <p role="alert" className="mb-3 rounded-lg bg-error/10 px-3 py-2 text-[13px] text-error">
             {failure.error instanceof Error ? failure.error.message : 'That action failed.'}
@@ -66,7 +66,8 @@ export function Vendors() {
           ) : !data || data.length === 0 ? (
             <EmptyState title="No vendors yet" hint="Seed the database or onboard a vendor." />
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[46rem] text-sm">
               <thead>
                 <tr className="border-b border-hairline text-left text-[12px] uppercase tracking-wide text-muted">
                   <th className="px-5 py-3 font-semibold">Vendor</th>
@@ -138,7 +139,8 @@ export function Vendors() {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </Card>
       </div>

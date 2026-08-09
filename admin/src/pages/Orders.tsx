@@ -45,7 +45,7 @@ export function Orders() {
         subtitle="Assign riders, override a stuck status, or refund to the customer's wallet."
       />
 
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-muted">
@@ -117,7 +117,8 @@ export function Orders() {
           ) : !data || data.length === 0 ? (
             <EmptyState title="No orders match" hint="Try clearing the filters." />
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[46rem] text-sm">
               <thead>
                 <tr className="border-b border-hairline text-left text-[12px] uppercase tracking-wide text-muted">
                   <th className="px-5 py-3 font-semibold">Reference</th>
@@ -158,7 +159,8 @@ export function Orders() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </Card>
 

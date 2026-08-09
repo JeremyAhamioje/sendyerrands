@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import logo from '@/assets/logo.png';
 
 import { Button, Field, inputClass } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -28,8 +29,10 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="mb-7 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-pink-600 text-lg font-bold text-white">
-            S
+          {/* On pink for the same reason as the sidebar: the artwork is
+              near-white and vanishes on a light background. */}
+          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-pink-600 p-1.5">
+            <img src={logo} alt="Sendy" className="h-full w-full object-contain" />
           </div>
           <div>
             <p className="text-lg font-bold leading-tight text-ink">Sendy</p>

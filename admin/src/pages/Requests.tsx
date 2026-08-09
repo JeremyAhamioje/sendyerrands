@@ -25,7 +25,7 @@ export function Requests() {
         subtitle="Marketplace requests customers posted for vendors to bid on."
       />
 
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="mb-4 flex flex-wrap gap-1.5">
           {TABS.map((t) => (
             <button
