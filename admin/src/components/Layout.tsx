@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
+import logo from '@/assets/logo.png';
+
 import { useAuth } from '@/lib/auth';
 import { useDashboard } from '@/lib/hooks';
 
@@ -21,9 +23,10 @@ export function Layout() {
     <div className="flex min-h-screen">
       <aside className="flex w-60 flex-none flex-col border-r border-hairline bg-white">
         <div className="flex items-center gap-2.5 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-600 text-sm font-bold text-white">
-            S
-          </div>
+          {/* Imported rather than referenced from /public so Vite fingerprints
+              it — an ops tool left open all day should not serve a stale logo
+              from cache after a rebrand. */}
+          <img src={logo} alt="Sendy" className="h-8 w-8 rounded-lg object-contain" />
           <div>
             <p className="text-sm font-bold leading-tight text-ink">Sendy</p>
             <p className="text-[11px] leading-tight text-muted">Operations</p>

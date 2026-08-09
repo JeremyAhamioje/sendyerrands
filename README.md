@@ -79,6 +79,52 @@ Current allowlist: `http://localhost:8081`, `:19006`, `:5180`, `:4180`.
 
 ---
 
+## Demo accounts
+
+Created by `cd api && npm run seed`. **OTP is `123456`** in development — the
+API accepts a fixed code rather than sending one, so no WhatsApp or SMS account
+is needed to sign in. In production that is off and a real code is sent.
+
+The app holds **one session at a time**, so signing in as a rider signs you out
+as a customer. That is not a bug — each role gets its own token, and a token
+from the wrong role is refused by design.
+
+### Customers — sign in at `/phone`
+
+| Number | Who | Good for |
+|---|---|---|
+| `+2348031234567` | Chinedu Okafor | The full demo — 6 orders, 3 saved addresses, active and past |
+| `+2348066704987` | jeremy ahamioje | One order |
+| `+2348166677152` | Ada Nwosu | An empty account: first-run states, empty cart, no orders |
+
+### Riders — sign in at `/phone?role=rider`, or Profile → Switch to rider app
+
+| Number | Who | Shows |
+|---|---|---|
+| `+2348094482210` | Emeka Adeyemi · motorbike | **Approved.** Can go online, accept jobs, complete deliveries |
+| `+2348055512345` | Tunde Bakare · keke | **Pending.** Verification banner, disabled availability switch |
+
+### Vendor — sign in at `/phone?role=vendor`, or Profile → Vendor dashboard
+
+| Number | Who | Shows |
+|---|---|---|
+| `+2348012345678` | Mama Nkechi Kitchen | Verified, 8 listings, open/closed switch, live order queue |
+
+Vendors cannot sign themselves up — verifying an unknown number returns 401. A
+vendor exists only because an application was approved, which is where the
+business name and area come from. To demo that path, apply from Profile →
+Become a vendor, then approve it in the dashboard's Applications tab.
+
+### Admin — the web dashboard, not the app
+
+`admin@sendy.ng`, with the password the seed printed once. Lost it:
+
+```bash
+cd api && npm run admin:password
+```
+
+---
+
 ## What's hosted, and what still needs a host
 
 | Piece | Where it lives now | Status |

@@ -42,7 +42,7 @@ export default function BidsReceived() {
         title="Bids received"
         right={
           <IconButton
-            icon="help-buoy-outline"
+            icon="headset-outline"
             onPress={() => router.push('/(tabs)/support')}
             accessibilityLabel="Help"
           />

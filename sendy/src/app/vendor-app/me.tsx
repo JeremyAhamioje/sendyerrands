@@ -86,7 +86,7 @@ export default function VendorMe() {
 
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">SETTINGS</Text>
         <Card className="mx-4 overflow-hidden">
-          <ListRow icon="help-buoy-outline" label="Vendor support" onPress={() => router.push('/help')} />
+          <ListRow icon="headset-outline" label="Vendor support" onPress={() => router.push('/help')} />
           {/*
             Signs out on the way across: the app holds one session at a time and
             this is a vendor token, so simply navigating to the customer tabs

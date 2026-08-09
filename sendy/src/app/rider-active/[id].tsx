@@ -103,7 +103,7 @@ export default function RiderActiveDelivery() {
             style={shadow.card}
             className="flex-row items-center bg-white rounded-full px-4 h-10"
           >
-            <Ionicons name="help-buoy-outline" size={16} color={colors.ink} />
+            <Ionicons name="headset-outline" size={16} color={colors.ink} />
             <Text className="text-ink text-[13px] font-semibold ml-2">Help</Text>
           </Pressable>
         </View>

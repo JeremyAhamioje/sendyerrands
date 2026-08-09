@@ -143,7 +143,7 @@ export default function RiderMe() {
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">SETTINGS</Text>
         <Card className="mx-4 overflow-hidden">
           <ListRow icon="notifications-outline" label="Job alerts" value="On" />
-          <ListRow icon="help-buoy-outline" label="Rider support" />
+          <ListRow icon="headset-outline" label="Rider support" />
           {/*
             Signs out on the way across. The app holds one session at a time and
             this is a rider token, so simply navigating to the customer tabs put
