@@ -68,17 +68,28 @@ type RequestOptions = {
   body?: unknown;
   token?: string | null;
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
-/** How long to wait before assuming the network is gone. */
-const TIMEOUT_MS = 20_000;
+/**
+ * How long to wait before assuming the network is gone.
+ *
+ * 30s, not 20s, because the API runs on Render's free tier: it sleeps after 15
+ * minutes idle and the first request afterwards measured ~25s while the
+ * instance woke. At 20s the client aborted a request that was about to
+ * succeed, and reported it as "check your connection" — on a connection that
+ * was fine.
+ *
+ * The real fix is a plan that does not sleep. Until then this is the floor.
+ */
+const TIMEOUT_MS = 30_000;
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, token, signal } = options;
+  const { method = 'GET', body, token, signal, timeoutMs = TIMEOUT_MS } = options;
 
   // Compose the caller's signal with our own timeout.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   signal?.addEventListener('abort', () => controller.abort());
 
   try {
@@ -115,12 +126,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       throw new ApiError(0, 'TIMEOUT', "That took too long. Check your connection and try again.");
     }
 
-    // fetch() rejects on DNS/connection failures — the usual case is the API
-    // simply not running, which is worth saying plainly during development.
+    // fetch() rejects on DNS/connection failures. In development the usual
+    // cause is the API not running, which is worth saying plainly; a customer
+    // on a phone cannot act on a base URL, so they get the plain version.
     throw new ApiError(
       0,
       'NETWORK',
-      `Can't reach Sendy Errands. Is the API running at ${API_BASE_URL}?`
+      __DEV__
+        ? `Can't reach Sendy Errands. Is the API running at ${API_BASE_URL}?`
+        : "Can't reach Sendy Errands. Check your connection and try again."
     );
   } finally {
     clearTimeout(timeout);

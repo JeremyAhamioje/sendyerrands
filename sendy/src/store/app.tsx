@@ -74,27 +74,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [activeAddressId, setActiveAddressId] = useState<string | null>(null);
 
-  // Restore a stored token on launch and confirm it is still valid.
+  /**
+   * Restore a stored token on launch.
+   *
+   * The stored token is trusted immediately and verified in the background,
+   * rather than the other way round.
+   *
+   * Verifying first meant a single slow `/auth/session` call decided whether
+   * the user was signed in, and *every* failure — timeout, DNS, 502 — looked
+   * identical to an expired token: the app fell through to onboarding with a
+   * perfectly good token still sitting in SecureStore. On Render's free tier
+   * the API sleeps after 15 minutes and the first request takes ~25s to wake
+   * it, past the client's abort. So anyone who opened the app less often than
+   * every 15 minutes was signed out on roughly every launch, while whoever was
+   * using it constantly never saw it once.
+   *
+   * A JWT is self-contained and lasts 30 days. There is nothing to ask the
+   * server for at launch: if the token really is dead, the next authenticated
+   * request returns 401 and QueryError offers signing in again.
+   */
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const stored = await loadSession();
-        if (!stored || cancelled) return;
-        await authApi.session(stored.token); // 401s if expired
-        if (cancelled) return;
+      // A SecureStore read can itself throw (keystore reset, restored backup).
+      // That is a real signed-out state; anything else is not.
+      const stored = await loadSession().catch(() => null);
+      if (cancelled) return;
+
+      if (stored) {
         setToken(stored.token);
         setActor(stored.actor);
+      }
+      setReady(true);
+      if (!stored) return;
+
+      try {
+        // Also the authoritative answer on actor, which matters when the stored
+        // value is older than the app's understanding of the roles.
+        const session = await authApi.session(stored.token);
+        if (!cancelled) setActor(session.actor);
       } catch (err) {
-        // Expired or revoked — drop it rather than leaving a dead token around.
-        if (err instanceof ApiError && err.isAuthError) await clearSession();
-      } finally {
-        if (!cancelled) setReady(true);
+        // ONLY 401 means the token is dead. A timeout or a 5xx means the API
+        // was asleep or unreachable, which the user cannot fix by signing in.
+        if (cancelled || !(err instanceof ApiError) || !err.isAuthError) return;
+        await clearSession();
+        setToken(null);
+        setActor('customer');
+        queryClient.clear();
       }
     })();
     return () => {
       cancelled = true;
     };
+    // queryClient is stable for the app's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { data: user } = useQuery({

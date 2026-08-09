@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Dimensions, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
 import { ProductCard } from '@/components/ProductCard';
 import { Badge, Chip, SectionHeader } from '@/components/ui/atoms';
@@ -22,7 +22,11 @@ export default function Marketplace() {
   const [category, setCategory] = useState('All');
   const [state, setState] = useState('All');
 
-  const colWidth = (Dimensions.get('window').width - 16 * 2 - 12) / 2;
+  // useWindowDimensions, not Dimensions.get: the latter is a snapshot, so the
+  // grid keeps phone-width columns when the window actually changes size —
+  // Android split-screen, a folding phone opening, a tablet.
+  const { width } = useWindowDimensions();
+  const colWidth = (width - 16 * 2 - 12) / 2;
   const { data: products = [] } = useMarketplaceProducts(query.trim() || undefined, state);
 
   // The API returns requests newest first, so the head is the one to surface.

@@ -36,7 +36,10 @@ async function deleteItem(key: string) {
   await SecureStore.deleteItemAsync(key);
 }
 
-export type StoredSession = { token: string; actor: 'customer' | 'rider' | 'vendor' };
+export type Actor = 'customer' | 'rider' | 'vendor';
+export type StoredSession = { token: string; actor: Actor };
+
+const ACTORS: Actor[] = ['customer', 'rider', 'vendor'];
 
 export async function saveSession(session: StoredSession) {
   await Promise.all([setItem(TOKEN_KEY, session.token), setItem(ACTOR_KEY, session.actor)]);
@@ -45,7 +48,12 @@ export async function saveSession(session: StoredSession) {
 export async function loadSession(): Promise<StoredSession | null> {
   const [token, actor] = await Promise.all([getItem(TOKEN_KEY), getItem(ACTOR_KEY)]);
   if (!token) return null;
-  return { token, actor: actor === 'rider' ? 'rider' : 'customer' };
+
+  // Checked against the list rather than `=== 'rider' ? … : 'customer'`, which
+  // silently downgraded every restored vendor session to a customer one: the
+  // vendor token then 403'd on every customer endpoint and the app told them
+  // to sign in again, on every launch, forever.
+  return { token, actor: ACTORS.find((a) => a === actor) ?? 'customer' };
 }
 
 export async function clearSession() {

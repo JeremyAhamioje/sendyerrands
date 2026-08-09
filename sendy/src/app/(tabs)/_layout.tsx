@@ -1,10 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/lib/theme';
 
 /** Customer tab bar (design.md §9) — Home · Search · Orders · Support · Profile. */
 export default function TabsLayout() {
+  /**
+   * The bar has to grow by the bottom inset rather than sit at a fixed height.
+   *
+   * Android is edge-to-edge from SDK 54 on, so the app draws underneath the
+   * system navigation and `insets.bottom` is non-zero — and it differs per
+   * device: roughly 48dp for three-button navigation, ~16dp for a gesture pill,
+   * 0 on a device with hardware keys. Supplying an explicit `height` also opts
+   * out of react-navigation's own inset handling, so the previous fixed 72
+   * put the labels behind the navigation bar on most Android phones while
+   * looking perfect on whichever one it was written against.
+   */
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -15,10 +29,11 @@ export default function TabsLayout() {
         tabBarStyle: {
           borderTopColor: colors.hairline,
           borderTopWidth: 1,
-          // 72 clears the 23px icon + 11px label without clipping descenders.
-          height: 72,
+          // 60 clears the 23px icon + 11px label without clipping descenders;
+          // the inset is the system's own space on top of that.
+          height: 60 + insets.bottom,
           paddingTop: 8,
-          paddingBottom: 12,
+          paddingBottom: 8 + insets.bottom,
           backgroundColor: colors.white,
         },
       }}
