@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Screen, ScreenHeader, StickyBar } from '@/components/ui/Screen';
 import { ApiError } from '@/lib/api/client';
 import { useApplyToSell, useMyVendorApplications } from '@/lib/api/hooks';
+import { NIGERIAN_STATES } from '@/lib/states';
 import { colors } from '@/lib/theme';
 
 /**
@@ -28,6 +29,7 @@ export default function BecomeVendor() {
   const [businessName, setBusinessName] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
+  const [state, setState] = useState('Lagos');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,10 @@ export default function BecomeVendor() {
   const approved = existing?.find((a) => a.status === 'APPROVED');
 
   const valid =
-    businessName.trim().length > 1 && category !== null && area !== null && phone.trim().length >= 10;
+    businessName.trim().length > 1 &&
+    category !== null &&
+    (state !== 'Lagos' || area !== null) &&
+    phone.trim().length >= 10;
 
   function submit() {
     setError(null);
@@ -44,7 +49,8 @@ export default function BecomeVendor() {
       {
         businessName: businessName.trim(),
         category: category!,
-        area: area!,
+        area: area ?? state,
+        state,
         phone: phone.trim(),
         address: address.trim() || undefined,
       },
@@ -106,8 +112,17 @@ export default function BecomeVendor() {
         <Text className="text-body text-[15px] mb-2">What do you sell?</Text>
         <ChipRow options={CATEGORIES} selected={category} onSelect={setCategory} />
 
-        <Text className="text-body text-[15px] mb-2 mt-4">Where are you based?</Text>
-        <ChipRow options={AREAS} selected={area} onSelect={setArea} />
+        <Text className="text-body text-[15px] mb-2 mt-4">Which state?</Text>
+        <ChipRow options={NIGERIAN_STATES} selected={state} onSelect={setState} />
+
+        {/* Area is the neighbourhood customers see; state is what they filter
+            on. Only Lagos has a useful area list today. */}
+        {state === 'Lagos' ? (
+          <>
+            <Text className="text-body text-[15px] mb-2 mt-4">Whereabouts in Lagos?</Text>
+            <ChipRow options={AREAS} selected={area} onSelect={setArea} />
+          </>
+        ) : null}
 
         <View className="mt-4">
           <Input

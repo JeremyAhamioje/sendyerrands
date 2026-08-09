@@ -14,6 +14,8 @@ const applicationSchema = z.object({
   businessName: z.string().min(2).max(120),
   category: z.string().min(2).max(60),
   area: z.string().min(2).max(80),
+  // Coarse location, so an approved vendor is filterable from day one.
+  state: z.string().min(2).max(40).default('Lagos'),
   phone: z.string().min(10).max(20),
   address: z.string().max(240).optional(),
   contactName: z.string().max(120).optional(),

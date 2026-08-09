@@ -35,13 +35,28 @@ marketplaceRouter.get(
   asyncHandler(async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q : undefined;
 
+    /**
+     * Proximity, coarsely.
+     *
+     * A radius would need coordinates on both ends and a geo query. A state is
+     * what someone actually means when they ask whether something is near
+     * enough to arrive today, and it is the one location fact every vendor has.
+     */
+    const state =
+      typeof req.query.state === 'string' && req.query.state !== 'All' ? req.query.state : undefined;
+
     const products = await prisma.product.findMany({
       where: {
         isMarketplace: true,
         inStock: true,
         ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+        ...(state ? { vendor: { state } } : {}),
       },
-      include: { vendor: { select: { name: true, slug: true, isVerified: true } } },
+      // Location travels with the product. A marketplace buyer is choosing
+      // between strangers, and where the item ships from decides it.
+      include: {
+        vendor: { select: { name: true, slug: true, isVerified: true, area: true, state: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -71,6 +86,8 @@ marketplaceRouter.get(
             slug: true,
             isVerified: true,
             isOpen: true,
+            area: true,
+            state: true,
             etaMinMinutes: true,
             etaMaxMinutes: true,
             deliveryFeeKobo: true,

@@ -45,6 +45,9 @@ export type Product = {
   vendor: string;
   price: number;
   biddable?: boolean;
+  /** Where it ships from — marketplace buyers weigh this as much as price. */
+  area?: string;
+  state?: string;
   thumb: Thumb;
 };
 

@@ -44,6 +44,17 @@ export function ProductCard({
         <Text className="text-muted text-[13px] mt-0.5" numberOfLines={1}>
           {product.vendor}
         </Text>
+        {/* Where it ships from. On a marketplace the seller is a stranger, so
+            distance is half the decision — and it is the thing customers were
+            having to open the vendor page to find. */}
+        {product.area || product.state ? (
+          <View className="flex-row items-center mt-1">
+            <Ionicons name="location-outline" size={12} color={colors.muted} />
+            <Text className="text-muted text-[12px] ml-1 flex-1" numberOfLines={1}>
+              {[product.area, product.state].filter(Boolean).join(', ')}
+            </Text>
+          </View>
+        ) : null}
         <Text className="text-ink text-[15px] font-bold mt-1">{naira(product.price)}</Text>
       </Pressable>
 

@@ -53,11 +53,11 @@ export function useVendor(slug: string | undefined) {
   });
 }
 
-export function useMarketplaceProducts(q?: string) {
+export function useMarketplaceProducts(q?: string, state?: string) {
   const { token } = useApp();
   return useQuery({
-    queryKey: ['marketplace-products', q],
-    queryFn: async () => (await marketplaceApi.products(q, token)).map(toProduct),
+    queryKey: ['marketplace-products', q ?? '', state ?? 'All'],
+    queryFn: async () => (await marketplaceApi.products(q, state, token)).map(toProduct),
   });
 }
 

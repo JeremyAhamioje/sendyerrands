@@ -90,6 +90,8 @@ export type ApiProduct = {
     id?: string;
     name: string;
     slug: string;
+    area?: string | null;
+    state?: string | null;
     isVerified: boolean;
     isOpen?: boolean;
     etaMinMinutes?: number;
@@ -187,6 +189,9 @@ export function toProduct(p: ApiProduct): Product {
     vendor: p.vendor?.name ?? '',
     price: koboToNaira(p.priceKobo),
     biddable: p.isBiddable,
+    // Where it ships from — the marketplace's most-asked question.
+    area: p.vendor?.area ?? undefined,
+    state: p.vendor?.state ?? undefined,
     thumb: thumbFrom(p.name, p.imageUrl),
   };
 }

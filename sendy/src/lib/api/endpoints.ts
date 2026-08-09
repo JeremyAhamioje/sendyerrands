@@ -83,6 +83,7 @@ export type VendorApplicationBody = {
   businessName: string;
   category: string;
   area: string;
+  state?: string;
   phone: string;
   address?: string;
   contactName?: string;
@@ -148,8 +149,12 @@ export const paymentsApi = {
 };
 
 export const marketplaceApi = {
-  products: (q: string | undefined, token?: string | null) =>
-    api.get<ApiProduct[]>(`/marketplace/products${q ? `?q=${encodeURIComponent(q)}` : ''}`, token),
+  products: (q: string | undefined, state: string | undefined, token?: string | null) => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (state && state !== 'All') qs.set('state', state);
+    return api.get<ApiProduct[]>(`/marketplace/products${qs.toString() ? `?${qs}` : ''}`, token);
+  },
 
   /**
    * One product for the item screen. Serves both a vendor's menu item and a

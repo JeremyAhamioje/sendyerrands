@@ -9,6 +9,7 @@ import { Badge, Chip, SectionHeader } from '@/components/ui/atoms';
 import { IconButton } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { useMarketplaceProducts, useMarketplaceRequests } from '@/lib/api/hooks';
+import { STATE_FILTERS } from '@/lib/states';
 import { timeUntil } from '@/lib/format';
 import { colors } from '@/lib/theme';
 
@@ -19,9 +20,10 @@ export default function Marketplace() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
+  const [state, setState] = useState('All');
 
   const colWidth = (Dimensions.get('window').width - 16 * 2 - 12) / 2;
-  const { data: products = [] } = useMarketplaceProducts(query.trim() || undefined);
+  const { data: products = [] } = useMarketplaceProducts(query.trim() || undefined, state);
 
   // The API returns requests newest first, so the head is the one to surface.
   const { data: requests } = useMarketplaceRequests();
@@ -93,6 +95,27 @@ export default function Marketplace() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             {CATEGORIES.map((c) => (
               <Chip key={c} label={c} selected={c === category} onPress={() => setCategory(c)} />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/*
+          Proximity, as coarsely as it can usefully be expressed.
+
+          Filtering happens on the server so it applies to the whole catalogue
+          rather than whichever page happens to be loaded — filtering a fetched
+          list would quietly hide items that simply had not arrived yet.
+        */}
+        <View className="mt-3">
+          <View className="flex-row items-center px-4 mb-2">
+            <Ionicons name="location-outline" size={14} color={colors.muted} />
+            <Text className="text-muted text-[13px] ml-1.5">
+              {state === 'All' ? 'Anywhere in Nigeria' : `Selling in ${state}`}
+            </Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+            {STATE_FILTERS.map((s) => (
+              <Chip key={s} label={s} selected={s === state} onPress={() => setState(s)} />
             ))}
           </ScrollView>
         </View>

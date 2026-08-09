@@ -494,6 +494,7 @@ adminRouter.post(
           name: application.businessName,
           slug,
           area: application.area,
+          state: application.state,
           // Doubles as the login for /phone?role=vendor.
           phone: application.phone,
           tags: [application.category],
