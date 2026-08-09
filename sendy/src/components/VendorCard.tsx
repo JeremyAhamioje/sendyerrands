@@ -76,7 +76,7 @@ export function VendorCard({
       </Pressable>
 
       <Pressable
-        onPress={() => toggle.mutate({ vendorId: vendor.id, saved })}
+        onPress={() => toggle.mutate({ vendor, saved })}
         accessibilityRole="button"
         accessibilityLabel={saved ? 'Remove from favourites' : 'Save vendor'}
         className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 items-center justify-center"

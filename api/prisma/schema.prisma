@@ -259,7 +259,13 @@ model Vendor {
   name            String
   slug            String   @unique
   tags            String[]
+  /// Neighbourhood — "Lekki Phase 1". Shown to customers so they know where
+  /// an item ships from; too granular to filter on.
   area            String?
+  /// The state this vendor trades in. Coarse enough to be a useful filter and
+  /// the unit Nigerians actually think in when judging whether something is
+  /// close. Defaults to Lagos because every existing vendor is there.
+  state           String   @default("Lagos")
   /// Doubles as the vendor login. Unique so an OTP resolves to one vendor;
   /// nullable because a vendor ops created by hand may not have one yet, and
   /// Postgres allows many NULLs under a unique index.

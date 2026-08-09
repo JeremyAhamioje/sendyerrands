@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ImagePickerAsset } from 'expo-image-picker';
 
+import type { Vendor } from '@/lib/mock';
+
 import { useApp } from '@/store/app';
 
 import { uploadImage, type UploadFolder } from './uploads';
@@ -523,15 +525,18 @@ export function useToggleFavourite() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ vendorId, saved }: { vendorId: string; saved: boolean }) =>
-      saved ? meApi.unsaveVendor(vendorId, token!) : meApi.saveVendor(vendorId, token!),
+    mutationFn: ({ vendor, saved }: { vendor: Vendor; saved: boolean }) =>
+      saved ? meApi.unsaveVendor(vendor.id, token!) : meApi.saveVendor(vendor.id, token!),
 
-    onMutate: async ({ vendorId, saved }) => {
+    onMutate: async ({ vendor, saved }) => {
       await qc.cancelQueries({ queryKey: ['favourites'] });
-      const previous = qc.getQueryData<ReturnType<typeof toVendor>[]>(['favourites']);
+      const previous = qc.getQueryData<Vendor[]>(['favourites']);
 
-      qc.setQueryData<ReturnType<typeof toVendor>[]>(['favourites'], (old = []) =>
-        saved ? old.filter((v) => v.id !== vendorId) : old
+      // The card hands over the whole vendor, so saving can fill the list
+      // immediately instead of waiting a round trip to learn what it just
+      // saved — the reason the heart used to look unresponsive.
+      qc.setQueryData<Vendor[]>(['favourites'], (old = []) =>
+        saved ? old.filter((v) => v.id !== vendor.id) : [vendor, ...old.filter((v) => v.id !== vendor.id)]
       );
 
       return { previous };
@@ -541,7 +546,6 @@ export function useToggleFavourite() {
       if (context?.previous) qc.setQueryData(['favourites'], context.previous);
     },
 
-    // Saving needs the vendor row the list renders, and only the server has it.
     onSettled: () => qc.invalidateQueries({ queryKey: ['favourites'] }),
   });
 }

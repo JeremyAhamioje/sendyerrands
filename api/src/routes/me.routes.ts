@@ -162,6 +162,24 @@ meRouter.get(
 );
 
 /**
+ * Accepts either a cuid or a slug, like GET /vendors/:slug already does.
+ *
+ * The app identifies a vendor by its slug — `toVendor` maps `id: slug || id`,
+ * so every screen holds "mama-nkechi" rather than a cuid. Requiring the
+ * database id here meant the heart on a vendor card always 404'd, while a test
+ * that passed real ids straight from Prisma passed happily. Taking either is
+ * both the fix and the consistent behaviour.
+ */
+async function resolveVendor(idOrSlug: string) {
+  const vendor = await prisma.vendor.findFirst({
+    where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+    select: { id: true, slug: true },
+  });
+  if (!vendor) throw notFound('Vendor');
+  return vendor;
+}
+
+/**
  * GET /me/favourites — vendors this customer saved.
  *
  * Returns whole vendor rows rather than ids: the Favourites screen renders the
@@ -191,18 +209,15 @@ meRouter.get(
 meRouter.put(
   '/favourites/:vendorId',
   asyncHandler(async (req, res) => {
-    const vendorId = req.params.vendorId!;
-
-    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
-    if (!vendor) throw notFound('Vendor');
+    const vendor = await resolveVendor(req.params.vendorId!);
 
     await prisma.favourite.upsert({
-      where: { userId_vendorId: { userId: req.auth!.id, vendorId } },
-      create: { userId: req.auth!.id, vendorId },
+      where: { userId_vendorId: { userId: req.auth!.id, vendorId: vendor.id } },
+      create: { userId: req.auth!.id, vendorId: vendor.id },
       update: {},
     });
 
-    res.json({ data: { vendorId, saved: true } });
+    res.json({ data: { vendorId: vendor.id, slug: vendor.slug, saved: true } });
   })
 );
 
@@ -210,12 +225,12 @@ meRouter.put(
 meRouter.delete(
   '/favourites/:vendorId',
   asyncHandler(async (req, res) => {
-    const vendorId = req.params.vendorId!;
+    const vendor = await resolveVendor(req.params.vendorId!);
 
     // deleteMany, not delete: removing something already gone is success here,
     // not a 404 the heart would have to render as a failure.
-    await prisma.favourite.deleteMany({ where: { userId: req.auth!.id, vendorId } });
+    await prisma.favourite.deleteMany({ where: { userId: req.auth!.id, vendorId: vendor.id } });
 
-    res.json({ data: { vendorId, saved: false } });
+    res.json({ data: { vendorId: vendor.id, slug: vendor.slug, saved: false } });
   })
 );
