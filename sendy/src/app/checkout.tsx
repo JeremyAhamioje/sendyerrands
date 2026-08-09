@@ -112,7 +112,7 @@ export default function Checkout() {
         <Card className="mb-5">
           <OptionRow
             icon="bicycle-outline"
-            title="Sendy Express"
+            title="Sendy Errands Express"
             subtitle="Fastest · 25–35 min"
             value={naira(deliveryFee)}
             selected={delivery === 'express'}
@@ -134,7 +134,7 @@ export default function Checkout() {
         <Card>
           <OptionRow
             icon="wallet-outline"
-            title="Sendy Wallet"
+            title="Sendy Errands Wallet"
             subtitle={`Balance ${naira(walletBalance)}`}
             selected={payment === 'wallet'}
             onPress={() => setPayment('wallet')}

@@ -49,7 +49,7 @@ export default function Profile() {
               style={{ borderRadius: 16, padding: 18 }}
             >
               <View className="flex-row items-center">
-                <Text className="text-white/80 text-[13px] flex-1">Sendy Wallet</Text>
+                <Text className="text-white/80 text-[13px] flex-1">Sendy Errands Wallet</Text>
                 <Ionicons name="arrow-forward-circle" size={22} color="rgba(255,255,255,0.9)" />
               </View>
               <Text className="text-white text-[30px] font-bold mt-1.5">
@@ -59,7 +59,7 @@ export default function Profile() {
                 <View className="bg-white/20 rounded-full px-3 py-1.5 flex-row items-center">
                   <Ionicons name="gift-outline" size={13} color={colors.white} />
                   <Text className="text-white text-[11px] font-semibold ml-1.5">
-                    Sendy Wallet
+                    Sendy Errands Wallet
                   </Text>
                 </View>
               </View>
@@ -129,7 +129,7 @@ export default function Profile() {
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>
 
-        <Text className="text-muted text-[11px] text-center mt-7">Sendy v1.0.0 (MVP)</Text>
+        <Text className="text-muted text-[11px] text-center mt-7">Sendy Errands v1.0.0 (MVP)</Text>
       </ScrollView>
     </Screen>
   );

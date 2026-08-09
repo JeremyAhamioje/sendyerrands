@@ -29,8 +29,8 @@ export default function VendorTabsLayout() {
             title="Sign in as a vendor"
             body={
               signedIn
-                ? 'You’re signed in as a customer. Vendors use the number Sendy approved for your business.'
-                : 'Sign in with the number Sendy approved for your business.'
+                ? 'You’re signed in as a customer. Vendors use the number Sendy Errands approved for your business.'
+                : 'Sign in with the number Sendy Errands approved for your business.'
             }
           >
             <Button

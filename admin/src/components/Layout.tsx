@@ -72,10 +72,10 @@ export function Layout() {
             rebrand.
           */}
           <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-pink-600 p-1">
-            <img src={logo} alt="Sendy" className="h-full w-full object-contain" />
+            <img src={logo} alt="Sendy Errands" className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold leading-tight text-ink">Sendy</p>
+            <p className="text-sm font-bold leading-tight text-ink">Sendy Errands</p>
             <p className="text-[11px] leading-tight text-muted">Operations</p>
           </div>
           <button
@@ -141,7 +141,7 @@ export function Layout() {
           <div className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-pink-600 p-0.5">
             <img src={logo} alt="" className="h-full w-full object-contain" />
           </div>
-          <p className="text-sm font-bold text-ink">Sendy Operations</p>
+          <p className="text-sm font-bold text-ink">Sendy Errands Operations</p>
         </div>
 
         <Outlet />

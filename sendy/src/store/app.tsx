@@ -128,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((line: Omit<CartLine, 'qty'>, vendor: string) => {
     setCart((prev) => {
-      // Switching vendors replaces the cart — Sendy dispatches one rider to one
+      // Switching vendors replaces the cart — Sendy Errands dispatches one rider to one
       // pickup, so a mixed-vendor cart cannot be fulfilled.
       const base = vendor !== vendorIdRef.current && prev.length ? [] : prev;
       vendorIdRef.current = vendor;

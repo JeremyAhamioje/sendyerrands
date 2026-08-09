@@ -1,6 +1,6 @@
-# Sendy API
+# Sendy Errands API
 
-REST backend for the Sendy MVP — errands, pickup & delivery, vendor marketplace,
+REST backend for the Sendy Errands MVP — errands, pickup & delivery, vendor marketplace,
 rider operations and the admin dashboard.
 
 **Node 22 · Express · TypeScript · Prisma · PostgreSQL**
@@ -197,7 +197,7 @@ Base URL: `/api/v1`. Auth is `Authorization: Bearer <jwt>`.
 | GET | `/admin/orders/:id` | Full detail + event timeline |
 | POST | `/admin/orders/:id/assign` | Manual rider assignment |
 | POST | `/admin/orders/:id/status` | Ops override |
-| POST | `/admin/orders/:id/refund` | Refunds to Sendy Wallet |
+| POST | `/admin/orders/:id/refund` | Refunds to Sendy Errands Wallet |
 | GET | `/admin/requests` | Request management |
 | PATCH | `/admin/vendors/:id` | Verify vendor / enable bidding |
 

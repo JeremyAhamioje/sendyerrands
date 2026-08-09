@@ -23,7 +23,7 @@ const SLIDES = [
   {
     art: require('../../assets/images/onboarding-errands.png'),
     title: 'Send someone\nfor anything',
-    body: 'Post an errand — buy it, collect it, drop it. A Sendy rider handles the rest.',
+    body: 'Post an errand — buy it, collect it, drop it. A Sendy Errands rider handles the rest.',
   },
   {
     art: require('../../assets/images/onboarding-parcels.png'),
@@ -33,7 +33,7 @@ const SLIDES = [
   {
     art: require('../../assets/images/onboarding-bids.png'),
     title: 'Vendors bid,\nyou pick the best',
-    body: 'Post what you need. Vendors compete on price and speed. Sendy delivers it.',
+    body: 'Post what you need. Vendors compete on price and speed. Sendy Errands delivers it.',
   },
 ];
 

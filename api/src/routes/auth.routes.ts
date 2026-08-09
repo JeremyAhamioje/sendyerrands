@@ -44,7 +44,7 @@ const verifySchema = z.object({
 /**
  * POST /auth/otp/request
  * Sends a 6-digit code. Always responds 200 for a valid number, whether or not
- * an account exists — otherwise this endpoint becomes a "is X a Sendy user?"
+ * an account exists — otherwise this endpoint becomes a "is X a Sendy Errands user?"
  * oracle for anyone with a phone book.
  */
 authRouter.post(
@@ -145,7 +145,7 @@ authRouter.post(
      * Customers and riders create their own account on first verify. A vendor
      * is different: it exists only because ops approved an application, which
      * is where the business name, category and area come from. If verifying an
-     * unknown number created one, anyone could become a vendor on the Sendy
+     * unknown number created one, anyone could become a vendor on the Sendy Errands
      * marketplace by typing their own phone number in.
      */
     if (body.role === 'vendor') {

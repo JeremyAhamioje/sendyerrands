@@ -120,7 +120,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError(
       0,
       'NETWORK',
-      `Can't reach Sendy. Is the API running at ${API_BASE_URL}?`
+      `Can't reach Sendy Errands. Is the API running at ${API_BASE_URL}?`
     );
   } finally {
     clearTimeout(timeout);

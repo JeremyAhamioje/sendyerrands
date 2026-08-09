@@ -178,7 +178,7 @@ export default function RiderMe() {
           />
         </Card>
 
-        <Text className="text-muted text-[11px] text-center mt-7">Sendy Rider v1.0.0 (MVP)</Text>
+        <Text className="text-muted text-[11px] text-center mt-7">Sendy Errands Rider v1.0.0 (MVP)</Text>
       </ScrollView>
     </Screen>
   );

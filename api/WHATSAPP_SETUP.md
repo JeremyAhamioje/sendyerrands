@@ -1,6 +1,6 @@
 # WhatsApp OTP setup
 
-Sendy sends login codes over the **WhatsApp Cloud API**, straight from Meta — no
+Sendy Errands sends login codes over the **WhatsApp Cloud API**, straight from Meta — no
 reseller in between. SMS via Termii is kept as a fallback only.
 
 ## Why not SMS first
@@ -110,7 +110,7 @@ Set that as `WHATSAPP_ACCESS_TOKEN`. It does not expire.
 ## 6. Going to production
 
 1. **Meta Business verification** — this is where the CAC certificate is finally required
-2. **Add Sendy's own phone number** as the sender (a number not already on WhatsApp)
+2. **Add the Sendy Errands phone number** as the sender (a number not already on WhatsApp)
 3. Remove the 5-recipient cap by moving the app out of development mode
 
 Meta includes **1,000 free service conversations per month**; authentication

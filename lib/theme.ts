@@ -1,4 +1,4 @@
-// Sendy design tokens (TS) — for places that can't use Tailwind classes,
+// Sendy Errands design tokens (TS) — for places that can't use Tailwind classes,
 // e.g. navigation options, StatusBar, chart libs. Keep in sync with tailwind.config.js.
 
 export const colors = {

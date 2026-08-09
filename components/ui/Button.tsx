@@ -11,7 +11,7 @@ type Props = {
   fullWidth?: boolean;
 };
 
-// Sendy button — see design.md §9.
+// Sendy Errands button — see design.md §9.
 export function Button({
   title,
   onPress,

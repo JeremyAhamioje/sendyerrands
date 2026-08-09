@@ -13,7 +13,7 @@ export type Vendor = {
   verified?: boolean;
 };
 
-// Sendy vendor card — see design.md §9 ("Vendor card").
+// Sendy Errands vendor card — see design.md §9 ("Vendor card").
 export function VendorCard({
   vendor,
   onPress,

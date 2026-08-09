@@ -18,14 +18,14 @@ const TRANSACTIONS = [
   { id: 't6', label: 'Refund · SND-8655', sub: '1 Aug', amount: 6400, icon: 'return-down-back-outline' as const },
 ];
 
-/** Sendy Wallet (design.md §10, under Profile). */
+/** Sendy Errands Wallet (design.md §10, under Profile). */
 export default function Wallet() {
   const { data } = useWallet();
   const balance = data?.balance ?? 0;
   return (
     <Screen className="bg-surface">
       <View className="bg-white">
-        <ScreenHeader title="Sendy Wallet" />
+        <ScreenHeader title="Sendy Errands Wallet" />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>

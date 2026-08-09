@@ -49,7 +49,11 @@ export default function Splash() {
           <View className="w-[112px] h-[112px] rounded-[32px] bg-white/15 items-center justify-center">
             <SendyMark size={78} color={colors.white} />
           </View>
-          <Text className="text-white text-[40px] font-display mt-6 tracking-tight">Sendy</Text>
+          {/* 34px, not 40: "Sendy Errands" is thirteen characters and wrapped
+              to two lines on a 360px-wide phone at the larger size. */}
+          <Text className="text-white text-[34px] font-display mt-6 tracking-tight text-center">
+            Sendy Errands
+          </Text>
           <Text className="text-white/80 text-[15px] mt-1">Send. Shop. Delivered.</Text>
 
           {/* delivery animation — transparent background, sits on the gradient.

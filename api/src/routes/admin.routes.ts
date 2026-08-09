@@ -231,7 +231,7 @@ adminRouter.post(
 );
 
 /**
- * POST /admin/orders/:id/refund — refunds to the Sendy Wallet.
+ * POST /admin/orders/:id/refund — refunds to the Sendy Errands Wallet.
  *
  * Wallet credit is instant, which is what customers actually want; bank
  * reversals through Paystack are a Phase-2 concern.

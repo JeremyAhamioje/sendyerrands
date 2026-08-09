@@ -79,7 +79,7 @@ export default function Search() {
             <Divider className="mx-4 my-2" />
 
             <View className="px-4 pt-3">
-              <Text className="text-ink text-[15px] font-bold mb-3">Popular on Sendy</Text>
+              <Text className="text-ink text-[15px] font-bold mb-3">Popular on Sendy Errands</Text>
               <View className="flex-row flex-wrap">
                 {SEARCH_SUGGESTIONS.map((s) => (
                   <View key={s} className="mb-2">

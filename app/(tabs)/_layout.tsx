@@ -2,7 +2,7 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../lib/theme";
 
-// Sendy bottom tab bar — see design.md §9 ("Bottom tab bar").
+// Sendy Errands bottom tab bar — see design.md §9 ("Bottom tab bar").
 export default function TabsLayout() {
   return (
     <Tabs

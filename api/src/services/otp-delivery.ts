@@ -5,7 +5,7 @@ import { sendWhatsAppOtp } from '@/services/whatsapp';
 /**
  * Picks how a one-time code actually reaches the customer.
  *
- * Sendy sends OTPs over WhatsApp by default and keeps SMS as the fallback.
+ * Sendy Errands sends OTPs over WhatsApp by default and keeps SMS as the fallback.
  * That order is deliberate: WhatsApp can be tested on a personal Meta account
  * today, whereas Nigerian SMS requires a registered business and a network-
  * approved Sender ID before a single message will be delivered. See

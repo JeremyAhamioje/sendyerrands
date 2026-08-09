@@ -79,7 +79,7 @@ export default function TrackOrder() {
         A status header, not a map.
 
         This was a 420px canvas with a drawn route and a bicycle marker moving
-        along it. Sendy has no location provider and no rider GPS, so that
+        along it. Sendy Errands has no location provider and no rider GPS, so that
         bicycle was decoration — it promised live positioning the product cannot
         do, on the exact feature that is scoped and priced as MVP 2. Showing a
         real status the server actually knows is both honest and more useful
@@ -139,7 +139,7 @@ export default function TrackOrder() {
                   ? 'Your rider will call when they arrive.'
                   : live
                     ? 'We’ll update this as your order moves.'
-                    : 'Delivered. Thanks for using Sendy.'}
+                    : 'Delivered. Thanks for using Sendy Errands.'}
           </Text>
         </View>
       </View>
@@ -263,7 +263,7 @@ export default function TrackOrder() {
                   rider?.phone
                     ? Linking.openURL(
                         `https://wa.me/${rider.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                          `Hi, about my Sendy order ${order.reference}`
+                          `Hi, about my Sendy Errands order ${order.reference}`
                         )}`
                       )
                     : undefined

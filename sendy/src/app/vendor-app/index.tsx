@@ -83,7 +83,7 @@ export default function VendorHome() {
                 than leaving a switch that silently does nothing. */}
             <Text className="text-white/80 text-[13px] mt-1.5">
               {!verified
-                ? 'You can open once Sendy has verified your business.'
+                ? 'You can open once Sendy Errands has verified your business.'
                 : open
                   ? 'Customers can order from you now.'
                   : 'Customers can see you but cannot order.'}

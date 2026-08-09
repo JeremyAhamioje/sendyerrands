@@ -60,7 +60,7 @@ export default function VendorMe() {
               <Text className="text-muted text-[13px] mt-0.5">
                 {verified
                   ? 'Customers can find and order from you.'
-                  : 'Sendy is reviewing your business details.'}
+                  : 'Sendy Errands is reviewing your business details.'}
               </Text>
             </View>
             <Badge label={verified ? 'Live' : 'Pending'} tone={verified ? 'success' : 'muted'} />
@@ -112,7 +112,7 @@ export default function VendorMe() {
           />
         </Card>
 
-        <Text className="text-muted text-[11px] text-center mt-7">Sendy Vendor v1.0.0 (MVP)</Text>
+        <Text className="text-muted text-[11px] text-center mt-7">Sendy Errands Vendor v1.0.0 (MVP)</Text>
       </ScrollView>
     </Screen>
   );

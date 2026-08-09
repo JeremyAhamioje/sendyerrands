@@ -147,7 +147,7 @@ const VENDORS = [
 ];
 
 async function main() {
-  console.log('Seeding Sendy…');
+  console.log('Seeding Sendy Errands…');
 
   // ── vendors + catalogue ───────────────────────────────────
   for (const v of VENDORS) {
@@ -207,7 +207,7 @@ async function main() {
     where: { email: adminEmail },
     create: {
       email: adminEmail,
-      name: 'Sendy Operations',
+      name: 'Sendy Errands Operations',
       role: 'SUPERADMIN',
       passwordHash: await bcrypt.hash(adminPassword, 10),
     },

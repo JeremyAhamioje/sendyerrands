@@ -3,7 +3,7 @@ import type { Ionicons } from '@expo/vector-icons';
 /**
  * Help centre content.
  *
- * Written against what Sendy actually does today, not what it will do. The
+ * Written against what Sendy Errands actually does today, not what it will do. The
  * tracking article says the stepper updates as the order moves and does not
  * mention a live map, because there isn't one — a help centre that describes a
  * feature the app lacks generates the support tickets it exists to prevent.
@@ -41,7 +41,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         a: [
           'Open the Orders tab and tap the order you want. The tracking screen shows the current stage — waiting for the vendor, being prepared, picked up, on the way, delivered — and updates as your order moves.',
           'Once a rider has your order you will see their name, plate number and rating, with buttons to call them or message them on WhatsApp.',
-          'Sendy does not show a rider’s position on a map yet. If you want to know exactly where they are, call them — they are expecting it.',
+          'Sendy Errands does not show a rider’s position on a map yet. If you want to know exactly where they are, call them — they are expecting it.',
         ],
       },
       {
@@ -58,7 +58,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         a: [
           'Open the order from the Orders tab and tap Cancel order. This works until a rider has picked it up.',
           'After pick-up the app will not let you cancel, because the vendor has already been paid and a rider is carrying your goods. Contact support and we will sort it out case by case.',
-          'Anything you have already paid goes back to your Sendy Wallet.',
+          'Anything you have already paid goes back to your Sendy Errands Wallet.',
         ],
       },
       {
@@ -91,16 +91,16 @@ export const HELP_TOPICS: HelpTopic[] = [
         slug: 'refunds',
         q: 'How do refunds work?',
         a: [
-          'Refunds go to your Sendy Wallet immediately, where you can spend them on your next order.',
+          'Refunds go to your Sendy Errands Wallet immediately, where you can spend them on your next order.',
           'If you would rather have the money back in your bank, contact support. Bank refunds take 3–5 working days because they go back through the card network.',
         ],
       },
       {
         slug: 'wallet',
-        q: 'What is the Sendy Wallet?',
+        q: 'What is the Sendy Errands Wallet?',
         a: [
           'A balance you can hold in the app. Refunds land there instantly, and paying from it is faster than entering a card each time.',
-          'You can see every movement in and out under Profile → Sendy Wallet.',
+          'You can see every movement in and out under Profile → Sendy Errands Wallet.',
         ],
       },
     ],
@@ -140,13 +140,13 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
   {
     slug: 'riders',
-    title: 'Riding with Sendy',
+    title: 'Riding with Sendy Errands',
     blurb: 'Signing up, verification and payouts',
     icon: 'bicycle-outline',
     articles: [
       {
         slug: 'sign-up',
-        q: 'How do I start riding for Sendy?',
+        q: 'How do I start riding for Sendy Errands?',
         a: [
           'From Profile, tap Switch to rider app and sign in with the number you want to ride under. You will be asked for your name, what you ride and your plate number.',
           'Rider accounts are separate from customer accounts, so you can keep using the same phone number for both.',

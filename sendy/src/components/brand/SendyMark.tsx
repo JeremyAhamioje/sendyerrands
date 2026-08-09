@@ -14,7 +14,7 @@ const MARK = require('../../../assets/images/sendy-mark.png');
 type Props = { size?: number; color?: string };
 
 /**
- * Sendy mark (design.md §3).
+ * Sendy Errands mark (design.md §3).
  *
  * One asset serves every placement. It ships white on transparent and
  * `tintColor` recolours it, so the mark reads correctly on pink, on white, or
@@ -28,7 +28,7 @@ export function SendyMark({ size = 40, color = colors.pink[600] }: Props) {
       style={{ width: size, height: size }}
       contentFit="contain"
       tintColor={color}
-      accessibilityLabel="Sendy"
+      accessibilityLabel="Sendy Errands"
     />
   );
 }

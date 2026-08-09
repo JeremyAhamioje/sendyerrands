@@ -1,4 +1,4 @@
-# Sendy
+# Sendy Errands
 
 Logistics, errands and marketplace delivery for Lagos. Three deployables in one
 repo:

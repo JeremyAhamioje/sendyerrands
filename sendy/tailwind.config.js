@@ -1,10 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-// Sendy design tokens — mirror of design.md §5–§7.
+// Sendy Errands design tokens — mirror of design.md §5–§7.
 // Edit a hex here and every screen updates.
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
-  // Sendy is a light-only product (app.json sets userInterfaceStyle: light).
+  // Sendy Errands is a light-only product (app.json sets userInterfaceStyle: light).
   // 'class' keeps NativeWind off the prefers-color-scheme media path, which
   // throws on web when anything tries to set the scheme imperatively.
   darkMode: 'class',

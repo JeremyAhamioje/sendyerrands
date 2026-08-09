@@ -11,6 +11,9 @@ import { env, features } from '@/config/env';
  * To go live:
  *   1. Create a Termii account and fund it.
  *   2. Register a Sender ID ("Sendy") — Termii must approve it first.
+ *      It stays "Sendy", not "Sendy Errands": alphanumeric sender IDs are
+ *      capped at 11 characters by the GSM spec, and 13 would be rejected.
+ *      The message body below carries the full name instead.
  *   3. Put the API key in TERMII_API_KEY and set OTP_DEV_MODE=false.
  */
 export async function sendSms(to: string, message: string): Promise<{ sent: boolean; id?: string }> {
@@ -58,5 +61,5 @@ export async function sendSms(to: string, message: string): Promise<{ sent: bool
 }
 
 export function otpMessage(code: string): string {
-  return `${code} is your Sendy verification code. It expires in 10 minutes. Never share it with anyone.`;
+  return `${code} is your Sendy Errands verification code. It expires in 10 minutes. Never share it with anyone.`;
 }

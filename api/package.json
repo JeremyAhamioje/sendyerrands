@@ -2,7 +2,7 @@
   "name": "sendy-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Sendy MVP REST API — logistics, errands, pickup & delivery, vendor marketplace.",
+  "description": "Sendy Errands MVP REST API — logistics, errands, pickup & delivery, vendor marketplace.",
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

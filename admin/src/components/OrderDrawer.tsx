@@ -365,7 +365,7 @@ function Actions({
         <div>
           <Field
             label="Refund to wallet"
-            hint="Credits the customer's Sendy Wallet instantly and marks the order refunded."
+            hint="Credits the customer's Sendy Errands Wallet instantly and marks the order refunded."
           >
             <div className="flex gap-2">
               <input

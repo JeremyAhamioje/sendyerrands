@@ -14,7 +14,7 @@ import { colors } from '@/lib/theme';
 /**
  * Categories ops can actually onboard today. A free-text field here produced
  * nothing useful to sort a queue by, and a long list of aspirational verticals
- * would promise onboarding Sendy cannot yet deliver.
+ * would promise onboarding Sendy Errands cannot yet deliver.
  */
 const CATEGORIES = ['Food', 'Groceries', 'Pharmacy', 'Electronics', 'Fashion', 'Other'];
 
@@ -69,7 +69,7 @@ export default function BecomeVendor() {
   if (pending || approved) {
     return (
       <Screen>
-        <ScreenHeader title="Sell on Sendy" onBack={() => router.back()} />
+        <ScreenHeader title="Sell on Sendy Errands" onBack={() => router.back()} />
         <View className="px-4 pt-6">
           <View className="bg-surface rounded-lg p-5 items-center">
             <Ionicons
@@ -93,7 +93,7 @@ export default function BecomeVendor() {
 
   return (
     <Screen>
-      <ScreenHeader title="Sell on Sendy" onBack={() => router.back()} />
+      <ScreenHeader title="Sell on Sendy Errands" onBack={() => router.back()} />
 
       <ScrollView contentContainerClassName="px-4 pt-4 pb-32" keyboardShouldPersistTaps="handled">
         <Text className="text-muted text-[15px] leading-[22px] mb-5">

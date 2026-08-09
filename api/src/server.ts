@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
-  console.log(`\n  Sendy API — ${env.NODE_ENV}`);
+  console.log(`\n  Sendy Errands API — ${env.NODE_ENV}`);
   console.log(`  ➜  http://localhost:${env.PORT}/api/v1`);
   console.log(`  ➜  health: http://localhost:${env.PORT}/health`);
   console.log(`  SMS:      ${features.sms ? 'Termii (live)' : 'stubbed — logs to console'}`);

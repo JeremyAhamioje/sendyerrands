@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Sendy design tokens — mirror of design.md §5–§7.
+// Sendy Errands design tokens — mirror of design.md §5–§7.
 // Edit here and every screen updates.
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],

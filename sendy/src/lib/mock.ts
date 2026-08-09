@@ -544,7 +544,7 @@ export const RIDER_JOBS: RiderJob[] = [
     id: 'job-2204',
     type: 'Package',
     payout: 2450,
-    pickupName: 'Sendy Hub, Ikoyi',
+    pickupName: 'Sendy Errands Hub, Ikoyi',
     pickupAddress: '24 Bourdillon Rd, Ikoyi',
     dropoffName: 'Femi K.',
     dropoffAddress: '1 Ligali Ayorinde, VI',
@@ -663,7 +663,7 @@ export const PROMOS: Promo[] = [
     // Light blue confetti, phone from 75%. Everything left of it is loose
     // confetti the copy can sit over, so it gets the full height.
     id: 'promo-3',
-    title: 'Fund your Sendy wallet',
+    title: 'Fund your Sendy Errands wallet',
     href: '/wallet',
     bg: '#81BDDC',
     headline: 'Top up once,\npay in one tap',
@@ -725,7 +725,7 @@ export const FAQS = [
   },
   {
     q: 'How do refunds work?',
-    a: 'Refunds go back to your Sendy Wallet instantly, or to your bank in 3–5 working days.',
+    a: 'Refunds go back to your Sendy Errands Wallet instantly, or to your bank in 3–5 working days.',
   },
 ];
 

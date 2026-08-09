@@ -126,7 +126,7 @@ export default function Cart() {
             <View className="w-9 h-9 rounded-full bg-pink-50 items-center justify-center mr-3">
               <Ionicons name="pricetag-outline" size={17} color={colors.pink[600]} />
             </View>
-            <Text className="flex-1 text-ink text-[15px]">Apply a voucher or Sendy credit</Text>
+            <Text className="flex-1 text-ink text-[15px]">Apply a voucher or Sendy Errands credit</Text>
             <Ionicons name="chevron-forward" size={17} color={colors.muted} />
           </Card>
         </Pressable>

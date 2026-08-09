@@ -29,7 +29,7 @@ export function Applications() {
     <>
       <PageHeader
         title="Vendor applications"
-        subtitle="Businesses asking to sell on Sendy. Approving creates the vendor — unverified and closed until you add its listings."
+        subtitle="Businesses asking to sell on Sendy Errands. Approving creates the vendor — unverified and closed until you add its listings."
       />
 
       <div className="p-4 sm:p-8">

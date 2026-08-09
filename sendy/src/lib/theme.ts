@@ -1,4 +1,4 @@
-// Sendy design tokens (TS) — for places that can't take a className:
+// Sendy Errands design tokens (TS) — for places that can't take a className:
 // navigation options, StatusBar, SVG fills, gradient stops.
 // Keep in sync with tailwind.config.js.
 

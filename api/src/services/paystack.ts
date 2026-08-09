@@ -39,7 +39,7 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new AppError(
       503,
       'PAYMENTS_UNAVAILABLE',
-      'Card payments are not configured yet. Pay with your Sendy Wallet, or add PAYSTACK_SECRET_KEY.'
+      'Card payments are not configured yet. Pay with your Sendy Errands Wallet, or add PAYSTACK_SECRET_KEY.'
     );
   }
 

@@ -1,6 +1,6 @@
-# Sendy Operations dashboard
+# Sendy Errands Operations dashboard
 
-Internal web dashboard for the Sendy API. Vite + React + TypeScript + Tailwind.
+Internal web dashboard for the Sendy Errands API. Vite + React + TypeScript + Tailwind.
 
 ## Running it
 

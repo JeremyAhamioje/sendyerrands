@@ -32,10 +32,10 @@ export function Login() {
           {/* On pink for the same reason as the sidebar: the artwork is
               near-white and vanishes on a light background. */}
           <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-pink-600 p-1.5">
-            <img src={logo} alt="Sendy" className="h-full w-full object-contain" />
+            <img src={logo} alt="Sendy Errands" className="h-full w-full object-contain" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight text-ink">Sendy</p>
+            <p className="text-lg font-bold leading-tight text-ink">Sendy Errands</p>
             <p className="text-[13px] leading-tight text-muted">Operations dashboard</p>
           </div>
         </div>

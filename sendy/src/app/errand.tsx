@@ -134,7 +134,7 @@ export default function CreateErrand() {
         <View className="flex-row items-start bg-surface rounded-md p-3.5">
           <Ionicons name="wallet-outline" size={17} color={colors.body} />
           <Text className="text-body text-[13px] ml-2.5 flex-1 leading-[18px]">
-            Your rider pays at the counter with Sendy funds and sends you the receipt. You&apos;re
+            Your rider pays at the counter with Sendy Errands funds and sends you the receipt. You&apos;re
             only charged for what they actually buy, plus the errand fee.
           </Text>
         </View>

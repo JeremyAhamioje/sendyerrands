@@ -22,7 +22,7 @@ const applicationSchema = z.object({
 });
 
 /**
- * POST /vendor-applications — apply to sell on Sendy.
+ * POST /vendor-applications — apply to sell on Sendy Errands.
  *
  * Only the fields a human needs to decide "should we call these people back".
  * Delivery fees, opening hours and the catalogue are set by ops on approval,

@@ -214,7 +214,7 @@ export default function PostRequest() {
             'Eligible vendors get your request.',
             'Bids arrive with price, ETA and a short note.',
             'You compare and select a winner.',
-            'Sendy assigns a rider and keeps you posted.',
+            'Sendy Errands assigns a rider and keeps you posted.',
           ].map((step, i) => (
             <View key={step} className="flex-row items-start mb-2">
               <View className="w-5 h-5 rounded-full bg-pink-100 items-center justify-center mr-2.5 mt-0.5">

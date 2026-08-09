@@ -1,7 +1,7 @@
 /**
  * Nigerian states, for the marketplace filter and vendor sign-up.
  *
- * Ordered by where Sendy actually trades rather than alphabetically. A filter
+ * Ordered by where Sendy Errands actually trades rather than alphabetically. A filter
  * row is scanned left to right and abandoned quickly, so the states with
  * vendors in them have to be reachable without scrolling past Abia and Adamawa.
  * The rest follow alphabetically, because past the first few any other ordering

@@ -3,7 +3,7 @@ import { env, features } from '@/config/env';
 /**
  * OTP delivery over the WhatsApp Cloud API (Meta, first-party — no reseller).
  *
- * Why this is the default channel for Sendy:
+ * Why this is the default channel for Sendy Errands:
  *
  *   1. You can test TODAY on a personal Meta account. Creating an app gets you
  *      a Meta-provided test sender number immediately, with no CAC document,

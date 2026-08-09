@@ -19,7 +19,7 @@ type Props = {
   className?: string;
 };
 
-/** Sendy button — design.md §9. One filled-pink primary per screen. */
+/** Sendy Errands button — design.md §9. One filled-pink primary per screen. */
 export function Button({
   title,
   onPress,

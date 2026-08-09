@@ -1,6 +1,6 @@
-# Sendy — Phase 1 MVP
+# Sendy Errands — Phase 1 MVP
 
-Cross-platform customer **and** rider app for the Sendy logistics / errands /
+Cross-platform customer **and** rider app for the Sendy Errands logistics / errands /
 delivery platform. Built to `design.md` (the design system) and the Phase 1 MVP
 scope in the proposal.
 

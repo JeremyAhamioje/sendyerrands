@@ -101,7 +101,7 @@ export async function transitionOrder(
     // Book the rider's cut exactly once, when the job actually completes.
     // Derive gross from the PAYOUT, not from deliveryFeeKobo: under a
     // free-delivery promo the customer is charged 0 while the rider is still
-    // owed the full amount, and Sendy eats the difference.
+    // owed the full amount, and Sendy Errands eats the difference.
     if (to === 'DELIVERED' && updated.riderId) {
       const { grossKobo, commissionKobo } = grossFromPayout(updated.riderPayoutKobo);
       await tx.riderEarning.upsert({

@@ -1,6 +1,6 @@
-# Sendy — Starter Setup
+# Sendy Errands — Starter Setup
 
-This is the **Sendy-specific layer** (design tokens + components + navigation) that sits on top of a fresh Expo app. `create-expo-app` writes the generic boilerplate; these files give it the Sendy pink/white identity from `design.md`.
+This is the **Sendy Errands layer** (design tokens + components + navigation) that sits on top of a fresh Expo app. `create-expo-app` writes the generic boilerplate; these files give it the Sendy Errands pink/white identity from `design.md`.
 
 ## 1. Create the base app
 

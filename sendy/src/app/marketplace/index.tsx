@@ -80,7 +80,7 @@ export default function Marketplace() {
                 Can&apos;t find it? Get vendors to bid
               </Text>
               <Text className="text-white/85 text-[13px] mt-1.5 leading-[18px] pr-16">
-                Post a request — vendors compete on price & speed. Sendy delivers.
+                Post a request — vendors compete on price & speed. Sendy Errands delivers.
               </Text>
               <View className="flex-row items-center bg-white rounded-full px-4 py-2.5 self-start mt-4">
                 <Text className="text-pink-600 text-[13px] font-bold mr-1.5">Post a request</Text>

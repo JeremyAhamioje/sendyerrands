@@ -1,4 +1,4 @@
-// Sendy MVP data model.
+// Sendy Errands MVP data model.
 //
 // Money rule: every amount is an Int of KOBO (1 naira = 100 kobo). Never store
 // naira as a float — 0.1 + 0.2 problems become real refund disputes.
@@ -339,7 +339,7 @@ model Order {
   serviceFeeKobo  Int @default(0)
   discountKobo    Int @default(0)
   totalKobo       Int @default(0)
-  // What the rider earns on this job, net of Sendy's commission.
+  // What the rider earns on this job, net of the platform commission.
   riderPayoutKobo Int @default(0)
 
   // Set when the customer schedules instead of ordering now.
@@ -567,7 +567,7 @@ enum VendorApplicationStatus {
 }
 
 /**
- * Someone asking to sell on Sendy, from Profile → Become a vendor.
+ * Someone asking to sell on Sendy Errands, from Profile → Become a vendor.
  * Deliberately not a Vendor row with a pending flag. An unapproved applicant
  * has none of what a Vendor needs — no slug, no delivery fee, no catalogue —
  * and every public vendor query would have to remember to exclude them. Kept

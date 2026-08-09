@@ -425,7 +425,7 @@ export function useRiderEarnings(range: 'today' | 'week' | 'month' = 'week') {
   });
 }
 
-// ── customer: selling on Sendy ──────────────────────────────
+// ── customer: selling on Sendy Errands ──────────────────────────────
 
 export function useMyVendorApplications() {
   const { token } = useApp();

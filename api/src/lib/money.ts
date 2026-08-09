@@ -40,7 +40,7 @@ export function computeTotals(input: {
   // The true cost of the trip. The rider is paid from THIS, always.
   const baseDeliveryFeeKobo = input.deliveryFeeKobo ?? env.DEFAULT_DELIVERY_FEE_KOBO;
 
-  // A "free delivery over ₦X" promo waives what the CUSTOMER pays. Sendy
+  // A "free delivery over ₦X" promo waives what the CUSTOMER pays. Sendy Errands
   // absorbs it — it is never taken out of the rider's earnings, or riders get
   // paid nothing for exactly the large orders that take the most effort.
   const qualifiesForFreeDelivery = Boolean(input.freeOverKobo && subtotalKobo >= input.freeOverKobo);
@@ -63,7 +63,7 @@ export function computeTotals(input: {
   };
 }
 
-/** Sendy takes PLATFORM_COMMISSION_BPS of the delivery fee; the rider keeps the rest. */
+/** Sendy Errands takes PLATFORM_COMMISSION_BPS of the delivery fee; the rider keeps the rest. */
 export function riderPayout(deliveryFeeKobo: number): number {
   const commission = Math.round((deliveryFeeKobo * env.PLATFORM_COMMISSION_BPS) / 10_000);
   return Math.max(0, deliveryFeeKobo - commission);

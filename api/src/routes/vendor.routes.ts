@@ -90,7 +90,7 @@ vendorRouter.patch(
      * changes nothing and implies they are trading.
      */
     if (isOpen && !vendor.isVerified) {
-      throw conflict('You can open for orders once Sendy has verified your business.');
+      throw conflict('You can open for orders once Sendy Errands has verified your business.');
     }
 
     const updated = await prisma.vendor.update({
@@ -133,7 +133,7 @@ vendorRouter.post(
      * of customers at worst.
      */
     if (body.imageUrl && !isOwnCloudinaryUrl(body.imageUrl)) {
-      throw conflict('Upload the image through Sendy rather than linking to one elsewhere.');
+      throw conflict('Upload the image through Sendy Errands rather than linking to one elsewhere.');
     }
 
     const product = await prisma.product.create({
@@ -152,7 +152,7 @@ vendorRouter.patch(
     const body = req.body as z.infer<typeof productPatchSchema>;
 
     if (body.imageUrl && !isOwnCloudinaryUrl(body.imageUrl)) {
-      throw conflict('Upload the image through Sendy rather than linking to one elsewhere.');
+      throw conflict('Upload the image through Sendy Errands rather than linking to one elsewhere.');
     }
 
     // Scoped by vendorId, not just id: without it a vendor could edit any
@@ -265,7 +265,7 @@ vendorRouter.post(
     // Only before a rider is involved: once someone is riding for this order,
     // cancelling it is an ops decision with a refund attached, not a tap.
     if (order.status !== 'PLACED') {
-      throw conflict('This order has already moved on. Contact Sendy support to cancel it.');
+      throw conflict('This order has already moved on. Contact Sendy Errands support to cancel it.');
     }
 
     const updated = await transitionOrder(

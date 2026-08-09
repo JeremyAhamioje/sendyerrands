@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Sendy",
+    "name": "Sendy Errands",
     "slug": "sendy",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -54,6 +54,9 @@
         "projectId": "d6e7e4b0-73b2-46b5-8446-f3894fd21616"
       }
     },
-    "owner": "jeremyexpos-team"
+    "owner": "jeremyexpos-team",
+    "updates": {
+      "url": "https://u.expo.dev/d6e7e4b0-73b2-46b5-8446-f3894fd21616"
+    }
   }
 }

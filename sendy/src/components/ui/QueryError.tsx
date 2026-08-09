@@ -43,7 +43,7 @@ export function QueryError({
         title={wrongActor ? 'You’re signed in as a rider' : 'Please sign in again'}
         body={
           wrongActor
-            ? 'This is the customer side of Sendy. Switch account to see your orders, or head back to the rider app.'
+            ? 'This is the customer side of Sendy Errands. Switch account to see your orders, or head back to the rider app.'
             : 'Your session has expired. Sign in to pick up where you left off.'
         }
       >

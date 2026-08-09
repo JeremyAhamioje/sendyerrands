@@ -5,7 +5,7 @@ import { api } from './client';
 /**
  * Direct-to-Cloudinary image upload.
  *
- * The binary never touches the Sendy API: it mints a short-lived signature,
+ * The binary never touches the Sendy Errands API: it mints a short-lived signature,
  * and the device posts the file straight to Cloudinary. A 4MB photo on a bad
  * Lagos connection would otherwise occupy a Node worker for the whole upload.
  * See api/src/services/cloudinary.ts for the other half.
