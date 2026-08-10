@@ -136,7 +136,15 @@ export default function RiderMe() {
             value="3 approved"
             onPress={() => router.push('/rider-verify')}
           />
-          <ListRow icon="card-outline" label="Payout account" value="GTBank ••4471" last />
+          <ListRow
+            icon="card-outline"
+            label="Payout account"
+            value={
+              rider?.bankAccountNo ? `${rider.bankName} ••${rider.bankAccountNo.slice(-4)}` : 'Not set'
+            }
+            last
+            onPress={() => router.push('/rider/payout-account')}
+          />
         </Card>
 
         {/* settings */}

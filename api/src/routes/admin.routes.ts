@@ -8,6 +8,12 @@ import { prisma } from '@/lib/prisma';
 import { asyncHandler, validate } from '@/middleware';
 import { requireAuth } from '@/middleware/auth';
 import { transitionOrder } from '@/services/orders';
+import {
+  PAYOUT_HOLD_HOURS,
+  PAYOUT_MIN_KOBO,
+  payableFor,
+  voidEarningForOrder,
+} from '@/services/payouts';
 
 export const adminRouter = Router();
 
@@ -269,12 +275,74 @@ adminRouter.post(
         data: { status: 'REFUNDED' },
       });
 
+      /**
+       * The rider was owed for this delivery. Refunding reverses the sale, so
+       * the earning has to go with it — otherwise the rider is still owed for
+       * something that no longer exists, and once transfers go live we pay it.
+       *
+       * If the money already left, say so rather than quietly rewriting
+       * history: recovering it is a conversation, not a database update.
+       */
+      const earning = await voidEarningForOrder(
+        orderId,
+        `Order ${order.reference} refunded${body.reason ? ` — ${body.reason}` : ''}`,
+        tx
+      );
+
       await transitionOrder(orderId, 'REFUNDED', { type: 'admin', id: req.auth!.id }, { note: body.reason, tx });
 
-      return { amountKobo, balanceKobo };
+      return { amountKobo, balanceKobo, riderEarning: earning };
     });
 
     res.json({ data: result });
+  })
+);
+
+/**
+ * GET /admin/payouts — the ledger, plus who is currently owed.
+ *
+ * Read-only by design. Sending the money is phase 3, and creating a payout is
+ * what marks earnings as paid — exposing that button before anything can settle
+ * it would let ops mark riders paid with nothing behind it.
+ */
+adminRouter.get(
+  '/payouts',
+  asyncHandler(async (_req, res) => {
+    const [payouts, riders] = await Promise.all([
+      prisma.payout.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: {
+          rider: { select: { firstName: true, lastName: true, phone: true } },
+          _count: { select: { earnings: true } },
+        },
+      }),
+      prisma.rider.findMany({
+        where: { earnings: { some: { isPaidOut: false, voidedAt: null } } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          bankName: true,
+          bankAccountNo: true,
+          bankAccountName: true,
+        },
+      }),
+    ]);
+
+    // One query per owed rider. Fine at this size — the list is riders with
+    // unpaid work, not the whole fleet — and worth revisiting past a few dozen.
+    const due = await Promise.all(riders.map(async (r) => ({ ...r, ...(await payableFor(r.id)) })));
+
+    res.json({
+      data: {
+        holdHours: PAYOUT_HOLD_HOURS,
+        minimumKobo: PAYOUT_MIN_KOBO,
+        due: due.sort((a, b) => b.payableKobo - a.payableKobo),
+        payouts,
+      },
+    });
   })
 );
 

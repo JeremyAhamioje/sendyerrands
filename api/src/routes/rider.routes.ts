@@ -7,6 +7,8 @@ import { asyncHandler, validate } from '@/middleware';
 import { requireApprovedRider, requireAuth } from '@/middleware/auth';
 import { isOwnCloudinaryUrl } from '@/services/cloudinary';
 import { transitionOrder } from '@/services/orders';
+import { listBanks, resolveAccount } from '@/services/paystack';
+import { PAYOUT_HOLD_HOURS, PAYOUT_MIN_KOBO, payableFor } from '@/services/payouts';
 
 export const riderRouter = Router();
 
@@ -297,8 +299,10 @@ riderRouter.get(
         orderBy: { createdAt: 'desc' },
         include: { order: { select: { reference: true, type: true, deliveredAt: true } } },
       }),
+      // voidedAt: null — a refunded delivery is not money the rider is owed,
+      // and showing it as available promises something that will never arrive.
       prisma.riderEarning.aggregate({
-        where: { riderId, isPaidOut: false },
+        where: { riderId, isPaidOut: false, voidedAt: null },
         _sum: { netKobo: true },
       }),
       prisma.rider.findUnique({
@@ -314,10 +318,18 @@ riderRouter.get(
       byDay.set(key, (byDay.get(key) ?? 0) + e.netKobo);
     }
 
+    const payable = await payableFor(riderId);
+
     res.json({
       data: {
         range,
         availableKobo: unpaid._sum.netKobo ?? 0,
+        // Split out so the screen can say "₦X ready, ₦Y clearing" instead of
+        // one number that does not match what a payout would actually send.
+        payableKobo: payable.payableKobo,
+        heldKobo: payable.heldKobo,
+        holdHours: PAYOUT_HOLD_HOURS,
+        minimumKobo: PAYOUT_MIN_KOBO,
         totalKobo: earnings.reduce((sum, e) => sum + e.netKobo, 0),
         trips: earnings.length,
         rating: rider?.rating ?? 5,
@@ -328,6 +340,94 @@ riderRouter.get(
         earnings,
       },
     });
+  })
+);
+
+// ── payout account ──────────────────────────────────────────────────
+
+/** GET /rider/banks — the list to pick from. Cached for a day upstream. */
+riderRouter.get(
+  '/banks',
+  asyncHandler(async (_req, res) => {
+    res.json({ data: await listBanks() });
+  })
+);
+
+const accountSchema = z.object({
+  bankCode: z.string().min(1).max(10),
+  accountNumber: z.string().regex(/^\d{10}$/, 'A Nigerian account number is 10 digits.'),
+});
+
+/**
+ * POST /rider/payout-account/resolve — who owns this account?
+ *
+ * Read-only on purpose. The rider sees the name the bank returns and confirms
+ * it before anything is stored: the difference between a typo caught in three
+ * seconds and a transfer into a stranger's account, which we cannot reverse.
+ */
+riderRouter.post(
+  '/payout-account/resolve',
+  validate(accountSchema),
+  asyncHandler(async (req, res) => {
+    const { bankCode, accountNumber } = req.body as z.infer<typeof accountSchema>;
+    res.json({ data: await resolveAccount(accountNumber, bankCode) });
+  })
+);
+
+/** PUT /rider/payout-account — stores the destination. */
+riderRouter.put(
+  '/payout-account',
+  validate(accountSchema),
+  asyncHandler(async (req, res) => {
+    const { bankCode, accountNumber } = req.body as z.infer<typeof accountSchema>;
+
+    const bank = (await listBanks()).find((b) => b.code === bankCode);
+    if (!bank) throw badRequest('Pick a bank from the list.');
+
+    // Resolved again rather than trusting whatever name the client sends
+    // alongside the number. The stored name is what a human reads before
+    // releasing money, so it has to come from the bank, not from the form.
+    const resolved = await resolveAccount(accountNumber, bankCode);
+
+    const rider = await prisma.rider.update({
+      where: { id: req.auth!.id },
+      data: {
+        bankCode,
+        bankAccountNo: accountNumber,
+        bankName: bank.name,
+        bankAccountName: resolved.accountName,
+        // Changing the destination invalidates the recipient Paystack holds;
+        // reusing it would send the next payout to the old account.
+        paystackRecipientCode: null,
+      },
+      select: { bankCode: true, bankAccountNo: true, bankName: true, bankAccountName: true },
+    });
+
+    res.json({ data: rider });
+  })
+);
+
+/** GET /rider/payouts — history, newest first. */
+riderRouter.get(
+  '/payouts',
+  asyncHandler(async (req, res) => {
+    const payouts = await prisma.payout.findMany({
+      where: { riderId: req.auth!.id },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: {
+        id: true,
+        amountKobo: true,
+        status: true,
+        reference: true,
+        bankName: true,
+        bankAccountNo: true,
+        failureReason: true,
+        createdAt: true,
+        settledAt: true,
+      },
+    });
+    res.json({ data: payouts });
   })
 );
 

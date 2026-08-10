@@ -122,6 +122,63 @@ export function verifyWebhookSignature(rawBody: Buffer, signature: string | unde
   return timingSafeEqual(a, b);
 }
 
+// ── payout destinations ─────────────────────────────────────────────
+
+export type Bank = { name: string; code: string; slug: string };
+
+type BankListResponse = { status: boolean; data: { name: string; code: string; slug: string }[] };
+type ResolveResponse = { status: boolean; data: { account_number: string; account_name: string } };
+
+/**
+ * Nigerian bank list, cached in memory for a day.
+ *
+ * It runs to a couple of hundred entries and changes when a bank is licensed or
+ * merges — not often enough to fetch on every rider who opens the form, and not
+ * static enough to hardcode.
+ */
+let bankCache: { at: number; banks: Bank[] } | null = null;
+const BANK_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function listBanks(): Promise<Bank[]> {
+  if (bankCache && Date.now() - bankCache.at < BANK_TTL_MS) return bankCache.banks;
+
+  const body = await paystackFetch<BankListResponse>('/bank?currency=NGN&country=nigeria');
+  const banks = body.data
+    .map((b) => ({ name: b.name, code: b.code, slug: b.slug }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  bankCache = { at: Date.now(), banks };
+  return banks;
+}
+
+/**
+ * Asks the bank who owns an account number.
+ *
+ * This is the only check that stands between a typo and money landing in a
+ * stranger's account, and it is why the resolved name is stored rather than
+ * anything the rider typed. A transfer to a valid-but-wrong account is not
+ * recoverable by us — it is a bank dispute, and the money is gone in the
+ * meantime.
+ */
+export async function resolveAccount(accountNumber: string, bankCode: string) {
+  try {
+    const body = await paystackFetch<ResolveResponse>(
+      `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`
+    );
+    return { accountNumber: body.data.account_number, accountName: body.data.account_name };
+  } catch (err) {
+    // Paystack answers a wrong number with a 4xx, which paystackFetch turns
+    // into a 502. That reads as "our provider is broken" when the truth is
+    // "check the digits", so it is worth restating.
+    if (err instanceof AppError && err.code === 'PAYSTACK_ERROR') {
+      throw badRequest(
+        'We could not find that account. Check the number and the bank, then try again.'
+      );
+    }
+    throw err;
+  }
+}
+
 export function assertPaidInFull(paidKobo: number, expectedKobo: number) {
   if (paidKobo < expectedKobo) {
     throw badRequest('The amount paid is less than the order total.');

@@ -26,6 +26,15 @@ export type ApiRider = {
   id: string; phone: string; firstName: string; lastName: string;
   status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   isOnline: boolean; rating?: number;
+  bankCode?: string | null; bankAccountNo?: string | null;
+  bankName?: string | null; bankAccountName?: string | null;
+};
+
+export type Bank = { name: string; code: string; slug: string };
+
+export type PayoutAccount = {
+  bankCode: string | null; bankAccountNo: string | null;
+  bankName: string | null; bankAccountName: string | null;
 };
 
 export type ApiVendorSession = {
@@ -211,6 +220,19 @@ export const riderApi = {
 
   setAvailability: (isOnline: boolean, token: string) =>
     api.patch<{ id: string; isOnline: boolean }>('/rider/availability', { isOnline }, token),
+
+  banks: (token: string) => api.get<Bank[]>('/rider/banks', token),
+
+  /** Asks the bank who owns an account, without storing anything. */
+  resolveAccount: (bankCode: string, accountNumber: string, token: string) =>
+    api.post<{ accountNumber: string; accountName: string }>(
+      '/rider/payout-account/resolve',
+      { bankCode, accountNumber },
+      token
+    ),
+
+  savePayoutAccount: (bankCode: string, accountNumber: string, token: string) =>
+    api.put<PayoutAccount>('/rider/payout-account', { bankCode, accountNumber }, token),
 
   jobs: (sort: 'nearest' | 'payout', token: string) =>
     api.get<ApiRiderJob[]>(`/rider/jobs?sort=${sort}`, token),

@@ -381,6 +381,42 @@ export function useRiderMe() {
   });
 }
 
+/** The bank list, cached hard — it changes when a bank is licensed, not daily. */
+export function useBanks() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['banks'],
+    queryFn: () => riderApi.banks(token!),
+    enabled: Boolean(token),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+/**
+ * Asks the bank who owns an account number, storing nothing.
+ *
+ * Separate from saving on purpose: the rider reads the name back and confirms
+ * it is theirs before any money can be aimed at it. A transfer into a valid but
+ * wrong account is a bank dispute, not something we can undo.
+ */
+export function useResolveAccount() {
+  const { token } = useApp();
+  return useMutation({
+    mutationFn: ({ bankCode, accountNumber }: { bankCode: string; accountNumber: string }) =>
+      riderApi.resolveAccount(bankCode, accountNumber, token!),
+  });
+}
+
+export function useSavePayoutAccount() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bankCode, accountNumber }: { bankCode: string; accountNumber: string }) =>
+      riderApi.savePayoutAccount(bankCode, accountNumber, token!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rider-me'] }),
+  });
+}
+
 export function useRiderJobs(sort: 'nearest' | 'payout' = 'nearest') {
   const { token } = useApp();
   return useQuery({

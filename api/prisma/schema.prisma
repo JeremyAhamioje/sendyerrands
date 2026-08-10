@@ -175,12 +175,20 @@ model Rider {
   bankCode      String?
   bankAccountNo String?
   bankName      String?
+  /// The account holder's name as Paystack resolved it — never as the rider
+  /// typed it. This is the only evidence that the account exists and belongs to
+  /// someone, and it is what a human checks before releasing money.
+  bankAccountName String?
+  /// Paystack's transfer recipient handle, created once and reused. Making a
+  /// new recipient per payout is wasted calls and extra ways to get it wrong.
+  paystackRecipientCode String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   documents RiderDocument[]
   orders    Order[]
   earnings  RiderEarning[]
+  payouts   Payout[]
 
   @@index([isOnline, status])
   @@map("riders")
@@ -550,12 +558,73 @@ model RiderEarning {
   paidOutAt      DateTime?
   createdAt      DateTime  @default(now())
 
-  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Which payout carried this earning. Set when the payout is created and
+  /// cleared if the transfer fails, so the earning returns to the payable pool
+  /// rather than vanishing into a payout that never happened.
+  payoutId String?
+
+  /// Set when the order behind this earning was refunded. A voided earning is
+  /// never payable. Without this, refunding an order left the rider still owed
+  /// for a sale that no longer exists — harmless while no money moved, and a
+  /// silent double-spend the moment transfers go live.
+  voidedAt   DateTime?
+  voidReason String?
+
+  rider  Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  order  Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payout Payout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
   @@index([riderId, createdAt])
   @@index([riderId, isPaidOut])
+  @@index([payoutId])
   @@map("rider_earnings")
+}
+
+/// Where a payout sits with the bank.
+///
+/// PENDING exists for the gap between "we decided to pay this" and "Paystack
+/// has accepted it". A row is written in that state *before* the provider is
+/// called, so a transfer that succeeds while the response is lost still has a
+/// reference to reconcile against instead of being sent a second time.
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+/// One bank transfer to one rider, covering a set of earnings.
+model Payout {
+  id         String       @id @default(cuid())
+  riderId    String
+  amountKobo Int
+  status     PayoutStatus @default(PENDING)
+
+  /// Our idempotency key, sent to Paystack as the transfer reference. Unique so
+  /// the database refuses a duplicate even if the application logic slips.
+  reference String @unique
+
+  /// Paystack's handles, kept for reconciliation and support.
+  transferCode  String?
+  recipientCode String?
+
+  /// Snapshot of where the money was sent. The rider can change their bank
+  /// details later; what a past payout says must not change with them.
+  bankName      String?
+  bankAccountNo String?
+
+  failureReason String?
+  providerPayload Json?
+  createdAt     DateTime  @default(now())
+  settledAt     DateTime?
+
+  rider    Rider          @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  earnings RiderEarning[]
+
+  @@index([riderId, createdAt])
+  @@index([status])
+  @@map("payouts")
 }
 
 /// Where a would-be vendor sits in review. Mirrors RiderStatus, minus

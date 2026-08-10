@@ -116,6 +116,9 @@ export default function RiderTabsLayout() {
           ),
         }}
       />
+      {/* Reached from Me, not the tab bar. Every file in this directory becomes
+          a tab unless it says otherwise. */}
+      <Tabs.Screen name="payout-account" options={{ href: null }} />
     </Tabs>
   );
 }
