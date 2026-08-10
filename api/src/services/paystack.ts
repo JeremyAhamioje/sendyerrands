@@ -47,19 +47,47 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  const res = await fetch(`${env.PAYSTACK_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  });
+  /**
+   * PAYSTACK_ERROR and PAYSTACK_UNREACHABLE are deliberately different codes.
+   *
+   * For money coming in the distinction barely matters — the customer retries.
+   * For money going out it is the whole game. A rejection means Paystack
+   * answered and did not create the transfer, so the payout can safely be
+   * unwound. A network failure means the request may well have been received
+   * and acted on, and unwinding it risks paying the same earnings twice.
+   * Callers must be able to tell those apart, so they cannot share a code.
+   */
+  let res: Response;
+  try {
+    res = await fetch(`${env.PAYSTACK_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    });
+  } catch (cause) {
+    throw new AppError(
+      504,
+      'PAYSTACK_UNREACHABLE',
+      'We could not reach the payment provider. The request may or may not have gone through.',
+      { cause: cause instanceof Error ? cause.message : String(cause) }
+    );
+  }
 
-  const payload = (await res.json()) as T & { message?: string };
+  const payload = (await res.json().catch(() => null)) as (T & { message?: string }) | null;
 
   if (!res.ok) {
-    throw new AppError(502, 'PAYSTACK_ERROR', payload.message ?? 'The payment provider rejected that request.');
+    throw new AppError(
+      502,
+      'PAYSTACK_ERROR',
+      payload?.message ?? 'The payment provider rejected that request.'
+    );
+  }
+
+  if (!payload) {
+    throw new AppError(502, 'PAYSTACK_ERROR', 'The payment provider sent a response we could not read.');
   }
 
   return payload;
@@ -177,6 +205,94 @@ export async function resolveAccount(accountNumber: string, bankCode: string) {
     }
     throw err;
   }
+}
+
+// ── transfers (money out) ───────────────────────────────────────────
+
+type RecipientResponse = { status: boolean; data: { recipient_code: string; active: boolean } };
+type TransferData = {
+  transfer_code: string;
+  reference: string;
+  /** pending | otp | success | failed | reversed | abandoned */
+  status: string;
+  amount: number;
+  reason?: string | null;
+};
+type TransferResponse = { status: boolean; data: TransferData };
+type BalanceResponse = { status: boolean; data: { currency: string; balance: number }[] };
+
+/**
+ * Registers a payout destination with Paystack and returns its handle.
+ *
+ * Cached on the rider afterwards. Paystack deduplicates identical recipients,
+ * but creating one per payout is a wasted round trip on the path where mistakes
+ * are least recoverable.
+ */
+export async function createTransferRecipient(params: {
+  name: string;
+  accountNumber: string;
+  bankCode: string;
+}) {
+  const body = await paystackFetch<RecipientResponse>('/transferrecipient', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'nuban',
+      name: params.name,
+      account_number: params.accountNumber,
+      bank_code: params.bankCode,
+      currency: 'NGN',
+    }),
+  });
+
+  return body.data.recipient_code;
+}
+
+/**
+ * Sends money.
+ *
+ * `reference` is ours and must be the Payout's. Paystack rejects a duplicate,
+ * which makes a retry of this call safe: the second attempt is refused by the
+ * provider rather than paying twice.
+ */
+export async function initiateTransfer(params: {
+  amountKobo: number;
+  recipientCode: string;
+  reference: string;
+  reason: string;
+}): Promise<TransferData> {
+  const body = await paystackFetch<TransferResponse>('/transfer', {
+    method: 'POST',
+    body: JSON.stringify({
+      source: 'balance',
+      amount: params.amountKobo,
+      recipient: params.recipientCode,
+      reference: params.reference,
+      reason: params.reason,
+      currency: 'NGN',
+    }),
+  });
+
+  return body.data;
+}
+
+/** Asks Paystack what became of a transfer. The fallback when a webhook is lost. */
+export async function verifyTransfer(reference: string): Promise<TransferData> {
+  const body = await paystackFetch<TransferResponse>(
+    `/transfer/verify/${encodeURIComponent(reference)}`
+  );
+  return body.data;
+}
+
+/**
+ * What is actually available to send, in kobo.
+ *
+ * Checked before initiating so an underfunded account produces "your Paystack
+ * balance is ₦X, this payout needs ₦Y" instead of a provider error that reads
+ * like the integration is broken.
+ */
+export async function fetchAvailableBalanceKobo(): Promise<number> {
+  const body = await paystackFetch<BalanceResponse>('/balance');
+  return body.data.find((b) => b.currency === 'NGN')?.balance ?? 0;
 }
 
 export function assertPaidInFull(paidKobo: number, expectedKobo: number) {

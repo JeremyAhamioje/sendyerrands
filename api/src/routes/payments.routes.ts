@@ -9,6 +9,7 @@ import { asyncHandler, validate } from '@/middleware';
 import { requireAuth } from '@/middleware/auth';
 import { transitionOrder } from '@/services/orders';
 import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from '@/services/paystack';
+import { settleTransfer } from '@/services/payouts';
 
 export const paymentsRouter = Router();
 
@@ -303,6 +304,18 @@ export const paystackWebhook = asyncHandler(async (req: Request, res: Response) 
     } else {
       await settlePayment(event.data.reference, true, event.data);
     }
+  }
+
+  /**
+   * Rider payouts settling.
+   *
+   * `transfer.reversed` can arrive days later, when a bank bounces a transfer
+   * that first looked fine. `settleTransfer` puts the earnings back on failure
+   * and reversal alike, so a bounce turns back into payable work instead of
+   * money the rider is owed and the system thinks it already sent.
+   */
+  if (event.event.startsWith('transfer.')) {
+    await settleTransfer(event.data.reference, event.data.status, event.data);
   }
 
   res.json({ received: true });

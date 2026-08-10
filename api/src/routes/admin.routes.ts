@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { badRequest, conflict, notFound, unauthorized } from '@/lib/errors';
+import { badRequest, conflict, forbidden, notFound, unauthorized } from '@/lib/errors';
 import { signToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler, validate } from '@/middleware';
@@ -12,6 +12,8 @@ import {
   PAYOUT_HOLD_HOURS,
   PAYOUT_MIN_KOBO,
   payableFor,
+  reconcilePayout,
+  sendPayout,
   voidEarningForOrder,
 } from '@/services/payouts';
 
@@ -343,6 +345,42 @@ adminRouter.get(
         payouts,
       },
     });
+  })
+);
+
+/**
+ * POST /admin/riders/:id/payout — pays a rider what they are owed.
+ *
+ * Restricted to OPERATIONS and SUPERADMIN. Support staff can see the ledger and
+ * cannot move money on it.
+ */
+adminRouter.post(
+  '/riders/:id/payout',
+  validate(z.object({ ignoreMinimum: z.boolean().optional() })),
+  asyncHandler(async (req, res) => {
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.auth!.id },
+      select: { role: true },
+    });
+    if (admin?.role !== 'OPERATIONS' && admin?.role !== 'SUPERADMIN') {
+      throw forbidden('Only operations staff can release payouts.');
+    }
+
+    const { ignoreMinimum } = req.body as { ignoreMinimum?: boolean };
+    res.json({ data: await sendPayout(req.params.id!, { ignoreMinimum }) });
+  })
+);
+
+/**
+ * POST /admin/payouts/:id/reconcile — asks Paystack what became of a payout.
+ *
+ * The way out of PENDING when a transfer request died in flight, and the manual
+ * equivalent of a webhook that never arrived.
+ */
+adminRouter.post(
+  '/payouts/:id/reconcile',
+  asyncHandler(async (req, res) => {
+    res.json({ data: await reconcilePayout(req.params.id!) });
   })
 );
 

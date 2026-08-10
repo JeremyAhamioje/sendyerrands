@@ -15,6 +15,7 @@ import {
   createPayout,
   payableFor,
   releaseFailedPayout,
+  settleTransfer,
 } from '../src/services/payouts';
 
 const naira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
@@ -121,6 +122,66 @@ async function main() {
 
         const after = await tx.payout.findUnique({ where: { id: payout.id }, select: { status: true } });
         check('the payout is marked FAILED', after?.status === 'FAILED');
+
+        // ── settlement state machine ──────────────────────────────────
+        console.log('\n  settlement:');
+
+        const owedNow = async () =>
+          (
+            await tx.riderEarning.aggregate({
+              where: { riderId: subject.id, isPaidOut: false, voidedAt: null },
+              _sum: { netKobo: true },
+            })
+          )._sum.netKobo ?? 0;
+
+        const fresh = async () => {
+          const p = await createPayout(subject.id, { tx, ignoreMinimum: true });
+          return p;
+        };
+
+        // success
+        let p = await fresh();
+        await settleTransfer(p.reference, 'success', null, tx);
+        let row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true, settledAt: true } });
+        check('success marks the payout SUCCESS', row?.status === 'SUCCESS');
+        check('success keeps the earnings claimed', (await owedNow()) === 0);
+        check('success records settledAt', row?.settledAt != null);
+
+        // a duplicate success webhook changes nothing
+        await settleTransfer(p.reference, 'success', null, tx);
+        check('a repeated success webhook is a no-op', (await owedNow()) === 0);
+
+        // a stray `failed` after success must not unwind a real payment
+        await settleTransfer(p.reference, 'failed', null, tx);
+        row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true } });
+        check('a late `failed` cannot undo a SUCCESS', row?.status === 'SUCCESS' && (await owedNow()) === 0);
+
+        /**
+         * The one that was broken until this test was written: a bank can
+         * accept a transfer and bounce it days later, so reversal has to be
+         * able to follow success.
+         */
+        await settleTransfer(p.reference, 'reversed', null, tx);
+        row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true } });
+        check('a reversal AFTER success is honoured', row?.status === 'REVERSED');
+        check('a reversal returns the earnings', (await owedNow()) === owed, naira(await owedNow()));
+
+        // reversal is final
+        await settleTransfer(p.reference, 'success', null, tx);
+        row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true } });
+        check('REVERSED is terminal', row?.status === 'REVERSED');
+
+        // failed straight from in-flight
+        p = await fresh();
+        await settleTransfer(p.reference, 'failed', null, tx);
+        row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true } });
+        check('failed marks FAILED and returns the earnings', row?.status === 'FAILED' && (await owedNow()) === owed);
+
+        // in-flight statuses are not terminal
+        p = await fresh();
+        await settleTransfer(p.reference, 'pending', null, tx);
+        row = await tx.payout.findUnique({ where: { id: p.id }, select: { status: true } });
+        check('`pending` leaves the payout alone', row?.status === 'PENDING' && (await owedNow()) === 0);
 
         throw new Error(ROLLBACK);
       },

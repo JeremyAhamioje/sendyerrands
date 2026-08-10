@@ -1,8 +1,14 @@
 import type { Prisma } from '@prisma/client';
 
-import { badRequest, conflict } from '@/lib/errors';
+import { AppError, badRequest, conflict } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
 import { paymentReference } from '@/lib/reference';
+import {
+  createTransferRecipient,
+  fetchAvailableBalanceKobo,
+  initiateTransfer,
+  verifyTransfer,
+} from '@/services/paystack';
 
 /**
  * The rider payout ledger.
@@ -18,10 +24,13 @@ import { paymentReference } from '@/lib/reference';
  *   - The Payout row, with its unique reference, is written BEFORE Paystack is
  *     called. If the transfer succeeds and the response is lost, the reference
  *     is already on disk to reconcile against instead of being sent again.
+ *   - Only a refusal we actually heard unwinds a payout. Silence does not,
+ *     because silence and success are indistinguishable from here.
  *
- * Phase 3 adds the transfer itself. This file deliberately does not call
- * Paystack: creating a payout marks earnings as paid, and until something
- * settles them that is a promise the system cannot keep on its own.
+ * The state machine is deliberately not symmetrical. REVERSED is the single
+ * terminal state: a bank can accept a transfer and bounce it days later, so
+ * reversal must be able to follow success, while a stray `failed` arriving
+ * after a real payment must not unwind it.
  */
 
 /**
@@ -38,6 +47,17 @@ export const PAYOUT_HOLD_HOURS = 24;
  * ₦200 hands most of it to the bank. Riders under this roll into the next run.
  */
 export const PAYOUT_MIN_KOBO = 200_000; // ₦2,000
+
+/**
+ * Paystack's own floor: it refuses any transfer under ₦50 outright.
+ *
+ * Separate from PAYOUT_MIN_KOBO because it is not ours to choose. The admin
+ * override can waive our minimum; it cannot waive the provider's, and without
+ * this check the override would cheerfully build a payout, mark the earnings
+ * paid, call Paystack, be refused, and unwind — a round trip that was never
+ * going to work. Found by probing the live API, not by reading the docs.
+ */
+export const PROVIDER_MIN_TRANSFER_KOBO = 5_000; // ₦50
 
 export type PayableSummary = {
   riderId: string;
@@ -149,6 +169,221 @@ export async function createPayout(
   };
 
   return options.tx ? build(options.tx) : prisma.$transaction(build);
+}
+
+/**
+ * Creates a payout and sends it.
+ *
+ * The order is the point. The Payout row, with its unique reference, is
+ * committed before Paystack is contacted, so there is never a moment where
+ * money has been sent against nothing on disk.
+ *
+ * What happens when the send fails is the part worth reading twice:
+ *
+ *   - Paystack answered and refused → the transfer does not exist, so the
+ *     earnings go back in the pool and the payout is marked FAILED.
+ *   - We could not reach Paystack → the transfer may exist. The payout stays
+ *     PENDING and the earnings stay claimed. Releasing them here is how the
+ *     same work gets paid twice, and a stuck payout is recoverable in a way
+ *     that a double payment is not. `reconcilePayout` resolves it.
+ */
+export async function sendPayout(
+  riderId: string,
+  options: { ignoreMinimum?: boolean } = {}
+) {
+  const rider = await prisma.rider.findUnique({
+    where: { id: riderId },
+    select: {
+      firstName: true,
+      lastName: true,
+      bankCode: true,
+      bankAccountNo: true,
+      bankAccountName: true,
+      paystackRecipientCode: true,
+    },
+  });
+  if (!rider) throw badRequest('No such rider.');
+  if (!rider.bankCode || !rider.bankAccountNo || !rider.bankAccountName) {
+    throw conflict('This rider has not added a verified payout account yet.');
+  }
+
+  // Everything that can fail without consequence happens before the payout row
+  // exists: a rider with no recipient or an underfunded balance should not
+  // leave a PENDING payout behind for someone to reconcile.
+  let recipientCode = rider.paystackRecipientCode;
+  if (!recipientCode) {
+    recipientCode = await createTransferRecipient({
+      // The bank's name for the account, not ours. If those disagree, the bank
+      // is right, and the disagreement is worth seeing on the Paystack side.
+      name: rider.bankAccountName,
+      accountNumber: rider.bankAccountNo,
+      bankCode: rider.bankCode,
+    });
+    await prisma.rider.update({
+      where: { id: riderId },
+      data: { paystackRecipientCode: recipientCode },
+    });
+  }
+
+  const preview = await payableFor(riderId);
+  if (preview.payableKobo <= 0) throw conflict('This rider has nothing payable right now.');
+  if (preview.payableKobo < PROVIDER_MIN_TRANSFER_KOBO) {
+    throw conflict(
+      `Paystack will not send less than ₦${(PROVIDER_MIN_TRANSFER_KOBO / 100).toLocaleString()}. ` +
+        `This rider is owed ₦${(preview.payableKobo / 100).toLocaleString()}.`
+    );
+  }
+
+  const available = await fetchAvailableBalanceKobo();
+  if (available < preview.payableKobo) {
+    throw conflict(
+      `Your Paystack balance is ₦${(available / 100).toLocaleString()} and this payout needs ` +
+        `₦${(preview.payableKobo / 100).toLocaleString()}. Fund the balance and try again.`
+    );
+  }
+
+  const payout = await createPayout(riderId, { ignoreMinimum: options.ignoreMinimum });
+
+  await prisma.payout.update({
+    where: { id: payout.id },
+    data: { recipientCode },
+  });
+
+  try {
+    const transfer = await initiateTransfer({
+      amountKobo: payout.amountKobo,
+      recipientCode,
+      reference: payout.reference,
+      reason: `Sendy Errands rider payout — ${rider.firstName} ${rider.lastName}`,
+    });
+
+    /**
+     * `otp` means the business still has "Transfers OTP" switched on, and this
+     * transfer is parked waiting for a code nobody is going to type. Treated as
+     * a failure rather than left in PROCESSING, because a payout that silently
+     * waits forever is worse than one that says what is wrong.
+     */
+    if (transfer.status === 'otp') {
+      await releaseFailedPayout(
+        payout.id,
+        'FAILED',
+        'Transfers OTP is enabled on this Paystack account, so the transfer cannot complete unattended.'
+      );
+      throw conflict(
+        'Transfers OTP is enabled on your Paystack account. Ask Paystack to disable it, then retry.'
+      );
+    }
+
+    await prisma.payout.update({
+      where: { id: payout.id },
+      data: {
+        status: transfer.status === 'success' ? 'SUCCESS' : 'PROCESSING',
+        transferCode: transfer.transfer_code,
+        providerPayload: transfer as never,
+        ...(transfer.status === 'success' ? { settledAt: new Date() } : {}),
+      },
+    });
+
+    return { ...payout, status: transfer.status, transferCode: transfer.transfer_code };
+  } catch (err) {
+    if (err instanceof AppError && err.code === 'PAYSTACK_ERROR') {
+      await releaseFailedPayout(payout.id, 'FAILED', err.message);
+      throw conflict(`Paystack refused the transfer: ${err.message}`);
+    }
+    // Includes PAYSTACK_UNREACHABLE and our own `otp` conflict above, both of
+    // which have already put the payout in the right state — or deliberately
+    // left it alone.
+    throw err;
+  }
+}
+
+/**
+ * Asks Paystack what became of a payout and settles it.
+ *
+ * The fallback for anything the webhook did not deliver, and the way a payout
+ * stuck in PENDING after an unreachable provider gets resolved. Safe to call
+ * repeatedly: it only ever moves a payout to the state Paystack reports.
+ */
+export async function reconcilePayout(payoutId: string) {
+  const payout = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: { id: true, reference: true, status: true },
+  });
+  if (!payout) throw badRequest('No such payout.');
+  if (payout.status === 'SUCCESS' || payout.status === 'REVERSED') return payout;
+
+  let transfer;
+  try {
+    transfer = await verifyTransfer(payout.reference);
+  } catch (err) {
+    /**
+     * A reference Paystack has never seen means the transfer was never created
+     * — the case where our request died on the way out. Only then is it safe to
+     * give the earnings back.
+     */
+    if (err instanceof AppError && err.code === 'PAYSTACK_ERROR') {
+      await releaseFailedPayout(payout.id, 'FAILED', 'Paystack has no record of this transfer.');
+      return { ...payout, status: 'FAILED' as const };
+    }
+    throw err;
+  }
+
+  return settleTransfer(payout.reference, transfer.status, transfer as unknown);
+}
+
+/**
+ * Applies a terminal transfer status to the payout behind a reference.
+ *
+ * Shared by the webhook and by reconciliation so the two cannot drift, and
+ * idempotent so a webhook retry after a manual reconcile changes nothing.
+ */
+export async function settleTransfer(
+  reference: string,
+  status: string,
+  payload?: unknown,
+  client: Prisma.TransactionClient = prisma
+) {
+  const payout = await client.payout.findUnique({
+    where: { reference },
+    select: { id: true, status: true },
+  });
+  if (!payout) return null;
+
+  /**
+   * Reversal has to be able to follow success.
+   *
+   * A bank can accept a transfer and bounce it days later, so `transfer.success`
+   * then `transfer.reversed` is a normal sequence, not a contradiction. Treating
+   * SUCCESS as terminal — which this did — meant that reversal was dropped on
+   * the floor: the money came back to us, the earnings stayed marked paid, and
+   * the rider was quietly owed for work the system believed it had settled.
+   *
+   * REVERSED is the only genuinely final state. Everything else can still move.
+   */
+  if (payout.status === 'REVERSED') return payout;
+
+  if (status === 'reversed') {
+    await releaseFailedPayout(payout.id, 'REVERSED', 'Paystack reversed the transfer.', client);
+    return client.payout.findUnique({ where: { id: payout.id } });
+  }
+
+  // Past this point a settled payout has nothing left to learn.
+  if (payout.status === 'SUCCESS') return payout;
+
+  if (status === 'success') {
+    return client.payout.update({
+      where: { id: payout.id },
+      data: { status: 'SUCCESS', settledAt: new Date(), providerPayload: payload as never },
+    });
+  }
+
+  if (status === 'failed' || status === 'abandoned') {
+    await releaseFailedPayout(payout.id, 'FAILED', `Paystack reported the transfer as ${status}.`, client);
+    return client.payout.findUnique({ where: { id: payout.id } });
+  }
+
+  // Still in flight (pending/otp) — nothing terminal to record yet.
+  return payout;
 }
 
 /**
