@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ImagePickerAsset } from 'expo-image-picker';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import type { Vendor } from '@/lib/mock';
 
@@ -13,6 +15,7 @@ import {
 } from './endpoints';
 import type { VendorProductBody } from './endpoints';
 import type { VendorApplicationBody } from './endpoints';
+import type { TopupResult } from './endpoints';
 import {
   koboToNaira, toBid, toMenuItem, toOrder, toProduct, toRiderJob, toVendor,
 } from './mappers';
@@ -268,6 +271,40 @@ export function useWallet() {
       };
     },
     enabled: Boolean(token),
+  });
+}
+
+/**
+ * Funds the wallet through Paystack's hosted checkout.
+ *
+ * `openAuthSessionAsync`, not `openBrowserAsync`: on Android the latter resolves
+ * the moment the Custom Tab opens, so the mutation would "finish" while the
+ * customer was still typing their card number. `openAuthSessionAsync` waits for
+ * the redirect back to our deep link, or for the sheet to be dismissed.
+ *
+ * Then it verifies regardless of how the sheet closed. The browser cannot tell
+ * us whether the card went through, and someone who paid and then hit Done
+ * deserves the same answer as someone who waited for the redirect. The server
+ * asks Paystack and credits idempotently, so calling this twice is harmless.
+ */
+export function useTopUpWallet() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (amountKobo: number): Promise<TopupResult> => {
+      const returnUrl = Linking.createURL('/wallet');
+      const { authorizationUrl, reference } = await paymentsApi.topup(amountKobo, returnUrl, token!);
+
+      await WebBrowser.openAuthSessionAsync(authorizationUrl, returnUrl);
+
+      return paymentsApi.verifyTopup(reference, token!);
+    },
+    onSuccess: (result) => {
+      if (result.status !== 'SUCCESS') return;
+      qc.invalidateQueries({ queryKey: ['wallet'] });
+      qc.invalidateQueries({ queryKey: ['me'] }); // the balance on Profile
+    },
   });
 }
 

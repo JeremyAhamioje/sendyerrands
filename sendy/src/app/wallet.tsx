@@ -1,35 +1,59 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Badge, Card, Divider } from '@/components/ui/atoms';
+import { Card, Divider, EmptyState, Skeleton } from '@/components/ui/atoms';
 import { Button } from '@/components/ui/Button';
-import { Screen, ScreenHeader } from '@/components/ui/Screen';
-import { useWallet } from '@/lib/api/hooks';
+import { Input } from '@/components/ui/Input';
+import { QueryError } from '@/components/ui/QueryError';
+import { Screen, ScreenHeader, StickyBar } from '@/components/ui/Screen';
+import { ApiError } from '@/lib/api/client';
+import { useTopUpWallet, useWallet } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
 import { colors } from '@/lib/theme';
 
-const TRANSACTIONS = [
-  { id: 't1', label: 'Mama Nkechi Kitchen', sub: 'Today, 2:31 PM', amount: -15700, icon: 'fast-food-outline' as const },
-  { id: 't2', label: 'Wallet top-up', sub: 'Today, 9:12 AM', amount: 20000, icon: 'add-circle-outline' as const },
-  { id: 't3', label: 'Send a package · Ikoyi → VI', sub: 'Today, 11:04 AM', amount: -1300, icon: 'cube-outline' as const },
-  { id: 't4', label: 'Referral bonus · Tunde A.', sub: 'Yesterday', amount: 1000, icon: 'gift-outline' as const },
-  { id: 't5', label: 'GadgetHub Lekki', sub: 'Yesterday, 5:12 PM', amount: -19500, icon: 'hardware-chip-outline' as const },
-  { id: 't6', label: 'Refund · SND-8655', sub: '1 Aug', amount: 6400, icon: 'return-down-back-outline' as const },
-];
+/**
+ * Sendy Errands Wallet (design.md §10, under Profile).
+ *
+ * Every figure here comes from `GET /me/wallet`. The statement used to be a
+ * hardcoded array that looked convincing and moved for nobody — it survived the
+ * wiring-up because the balance above it was real, so the screen never looked
+ * broken.
+ */
 
-/** Sendy Errands Wallet (design.md §10, under Profile). */
+/** Amounts are small on purpose — see TOPUP_MIN_KOBO in payments.routes.ts. */
+const PRESETS_KOBO = [1_000, 2_000, 5_000, 10_000];
+
+const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  TOPUP: 'add-circle-outline',
+  ORDER_DEBIT: 'bag-handle-outline',
+  REFUND: 'return-down-back-outline',
+  REFERRAL_BONUS: 'gift-outline',
+  PAYOUT: 'arrow-up-circle-outline',
+  ADJUSTMENT: 'construct-outline',
+};
+
 export default function Wallet() {
-  const { data } = useWallet();
+  const { data, isLoading, isError, error, refetch, isRefetching } = useWallet();
+  const [funding, setFunding] = useState(false);
+
   const balance = data?.balance ?? 0;
+  const transactions = data?.transactions ?? [];
+
   return (
     <Screen className="bg-surface">
       <View className="bg-white">
         <ScreenHeader title="Sendy Errands Wallet" />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-        {/* balance */}
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.pink[600]} />
+        }
+      >
         <LinearGradient
           colors={[colors.pink[600], colors.pink[900]]}
           start={{ x: 0, y: 0 }}
@@ -37,77 +61,236 @@ export default function Wallet() {
           style={{ borderRadius: 16, padding: 20 }}
         >
           <Text className="text-white/80 text-[13px]">Available balance</Text>
-          <Text className="text-white text-[34px] font-bold mt-1">
-            {naira(balance)}
-          </Text>
+          {isLoading ? (
+            <View className="h-[41px] justify-center">
+              <View className="bg-white/25 rounded-md h-7 w-40" />
+            </View>
+          ) : (
+            <Text className="text-white text-[34px] font-bold mt-1">{naira(balance)}</Text>
+          )}
           <View className="flex-row items-center mt-2">
             <View className="bg-white/20 rounded-full px-3 py-1.5 flex-row items-center">
               <Ionicons name="gift-outline" size={13} color={colors.white} />
-              <Text className="text-white text-[11px] font-semibold ml-1.5">
-                Instant refunds
-              </Text>
+              <Text className="text-white text-[11px] font-semibold ml-1.5">Instant refunds</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* actions */}
         <View className="flex-row mt-4">
           <View className="flex-1 mr-3">
-            <Button title="Fund wallet" icon="add" />
+            <Button title="Fund wallet" icon="add" onPress={() => setFunding(true)} />
           </View>
           <View className="flex-1">
-            <Button title="Withdraw" variant="secondary" icon="arrow-up" />
+            {/* Disabled rather than absent: withdrawal is a planned feature and
+                hiding it invites the same question every time. Disabled and
+                explained answers it once. */}
+            <Button title="Withdraw" variant="secondary" icon="arrow-up" disabled />
           </View>
         </View>
+        <Text className="text-muted text-[12px] mt-2 text-center">
+          Withdrawals to a bank account aren&apos;t live yet. Refunds land here instantly and can be
+          spent on any order.
+        </Text>
 
-        {/* auto top-up */}
-        <Card className="flex-row items-center p-4 mt-4">
-          <View className="w-9 h-9 rounded-full bg-pink-50 items-center justify-center mr-3">
-            <Ionicons name="repeat-outline" size={17} color={colors.pink[600]} />
-          </View>
-          <View className="flex-1">
-            <Text className="text-ink text-[15px] font-semibold">Auto top-up</Text>
-            <Text className="text-muted text-[13px] mt-0.5">
-              Add {naira(10000)} when balance drops below {naira(2000)}
-            </Text>
-          </View>
-          <Badge label="Off" tone="muted" />
-        </Card>
-
-        {/* transactions */}
         <Text className="text-muted text-[13px] font-semibold mt-6 mb-2.5">TRANSACTIONS</Text>
-        <Card>
-          {TRANSACTIONS.map((tx, i) => (
-            <View key={tx.id}>
-              {i > 0 ? <Divider className="mx-4" /> : null}
-              <View className="flex-row items-center px-4 py-3.5">
-                <View
-                  className={`w-9 h-9 rounded-full items-center justify-center mr-3 ${
-                    tx.amount > 0 ? 'bg-success/10' : 'bg-surface'
-                  }`}
-                >
-                  <Ionicons
-                    name={tx.icon}
-                    size={17}
-                    color={tx.amount > 0 ? colors.success : colors.body}
-                  />
+
+        {isError ? (
+          <Card className="p-4">
+            <QueryError error={error} onRetry={() => refetch()} noun="your transactions" />
+          </Card>
+        ) : isLoading ? (
+          <Card className="p-4">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="w-full h-12 mb-3" />
+            ))}
+          </Card>
+        ) : transactions.length === 0 ? (
+          <Card className="py-2">
+            <EmptyState
+              icon="receipt-outline"
+              title="Nothing here yet"
+              body="Fund your wallet or place an order and every movement in and out will show up here."
+            />
+          </Card>
+        ) : (
+          <Card>
+            {transactions.map((tx, i) => {
+              const credit = tx.amount > 0;
+              return (
+                <View key={tx.id}>
+                  {i > 0 ? <Divider className="mx-4" /> : null}
+                  <View className="flex-row items-center px-4 py-3.5">
+                    <View
+                      className={`w-9 h-9 rounded-full items-center justify-center mr-3 ${
+                        credit ? 'bg-success/10' : 'bg-surface'
+                      }`}
+                    >
+                      <Ionicons
+                        name={ICONS[tx.type] ?? 'ellipse-outline'}
+                        size={17}
+                        color={credit ? colors.success : colors.body}
+                      />
+                    </View>
+                    <View className="flex-1 pr-2">
+                      <Text className="text-ink text-[15px] font-medium" numberOfLines={1}>
+                        {tx.description}
+                      </Text>
+                      <Text className="text-muted text-[13px] mt-0.5">{when(tx.createdAt)}</Text>
+                    </View>
+                    <Text
+                      className={`text-[15px] font-bold ${credit ? 'text-success' : 'text-ink'}`}
+                    >
+                      {credit ? '+' : '−'} {naira(Math.abs(tx.amount))}
+                    </Text>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-ink text-[15px] font-medium" numberOfLines={1}>
-                    {tx.label}
-                  </Text>
-                  <Text className="text-muted text-[13px] mt-0.5">{tx.sub}</Text>
-                </View>
-                <Text
-                  className={`text-[15px] font-bold ${tx.amount > 0 ? 'text-success' : 'text-ink'}`}
-                >
-                  {tx.amount > 0 ? '+' : '−'} {naira(Math.abs(tx.amount))}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </Card>
+              );
+            })}
+          </Card>
+        )}
       </ScrollView>
+
+      <TopUpSheet open={funding} onClose={() => setFunding(false)} />
     </Screen>
   );
+}
+
+function TopUpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const topUp = useTopUpWallet();
+
+  const [selected, setSelected] = useState<number | null>(PRESETS_KOBO[0]);
+  const [custom, setCustom] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+
+  // A typed amount always wins over a chip, so the two can never disagree.
+  const customKobo = Math.round(Number(custom.replace(/[^0-9.]/g, '')) * 100);
+  const amountKobo = custom.trim() ? customKobo : (selected ?? 0);
+  const valid = amountKobo >= 1_000 && amountKobo <= 100_000;
+
+  function close() {
+    setProblem(null);
+    setCustom('');
+    setSelected(PRESETS_KOBO[0]);
+    onClose();
+  }
+
+  async function fund() {
+    setProblem(null);
+    try {
+      const result = await topUp.mutateAsync(amountKobo);
+      if (result.status === 'SUCCESS') return close();
+
+      setProblem(
+        result.status === 'ABANDONED'
+          ? 'You closed the payment before it went through. Nothing was charged.'
+          : "That payment didn't go through. Nothing was charged."
+      );
+    } catch (err) {
+      setProblem(
+        err instanceof ApiError ? err.message : 'Could not start the payment. Try again.'
+      );
+    }
+  }
+
+  return (
+    <Modal visible={open} animationType="slide" onRequestClose={close}>
+      <Screen>
+        <View className="flex-row items-center px-4 py-3 border-b border-hairline">
+          <Text className="text-ink text-[18px] font-bold flex-1">Fund wallet</Text>
+          <Pressable
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            className="p-2"
+          >
+            <Ionicons name="close" size={22} color={colors.ink} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text className="text-body text-[15px] mb-3">How much?</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {PRESETS_KOBO.map((kobo) => {
+              const on = !custom.trim() && selected === kobo;
+              return (
+                <Pressable
+                  key={kobo}
+                  onPress={() => {
+                    setSelected(kobo);
+                    setCustom('');
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  className={`px-5 h-11 rounded-full items-center justify-center border-[1.5px] ${
+                    on ? 'bg-pink-600 border-pink-600' : 'bg-surface border-transparent'
+                  }`}
+                >
+                  <Text className={`text-[15px] font-semibold ${on ? 'text-white' : 'text-body'}`}>
+                    {naira(kobo / 100)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View className="mt-5">
+            <Input
+              label="Or another amount"
+              value={custom}
+              onChangeText={setCustom}
+              placeholder="0"
+              prefix="₦"
+              keyboardType="number-pad"
+              helper="Between ₦10 and ₦1,000."
+              error={custom.trim() && !valid ? 'Enter an amount between ₦10 and ₦1,000.' : undefined}
+            />
+          </View>
+
+          <View className="bg-surface rounded-lg p-4 mt-2">
+            <Text className="text-body text-[13px] leading-[19px]">
+              Amounts are kept small while the wallet is being tested — treat ₦10 as if it were
+              ₦10,000. You&apos;ll pay through Paystack and come straight back here.
+            </Text>
+          </View>
+
+          {__DEV__ ? (
+            <View className="bg-surface rounded-lg p-4 mt-3">
+              <Text className="text-muted text-[12px] font-semibold mb-1">TEST MODE</Text>
+              <Text className="text-muted text-[12px] leading-[18px]">
+                Card 4084 0840 8408 4081 · CVV 408 · any future expiry · PIN 0000 · OTP 123456. No
+                real money moves on test keys.
+              </Text>
+            </View>
+          ) : null}
+
+          {problem ? <Text className="text-error text-[14px] mt-4">{problem}</Text> : null}
+        </ScrollView>
+
+        <StickyBar>
+          <Button
+            title={valid ? `Pay ${naira(amountKobo / 100)}` : 'Pay'}
+            onPress={fund}
+            disabled={!valid}
+            loading={topUp.isPending}
+          />
+        </StickyBar>
+      </Screen>
+    </Modal>
+  );
+}
+
+/** "Today, 2:31 PM" / "Yesterday" / "12 Aug" — enough to locate a payment. */
+function when(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const days = Math.floor((midnight - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86_400_000);
+
+  const time = date.toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
 }

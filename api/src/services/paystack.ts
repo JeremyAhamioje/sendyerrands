@@ -31,6 +31,10 @@ type VerifyResponse = {
     amount: number;
     paid_at: string | null;
     channel: string;
+    // Echoed back exactly as sent to /transaction/initialize. This is how a
+    // top-up is told apart from an order payment, and how it is tied to the
+    // customer who started it.
+    metadata?: Record<string, unknown>;
   };
 };
 
@@ -67,6 +71,13 @@ export async function initializeTransaction(params: {
   amountKobo: number;
   reference: string;
   metadata?: Record<string, unknown>;
+  /**
+   * Where Paystack sends the browser once the payment finishes. The app passes
+   * its own deep link so the payment sheet closes itself instead of stranding
+   * the customer on the dashboard's callback page. Omitted, Paystack falls back
+   * to whatever is configured on the dashboard.
+   */
+  callbackUrl?: string;
 }) {
   const body = await paystackFetch<InitResponse>('/transaction/initialize', {
     method: 'POST',
@@ -76,6 +87,7 @@ export async function initializeTransaction(params: {
       reference: params.reference,
       metadata: params.metadata ?? {},
       currency: 'NGN',
+      ...(params.callbackUrl ? { callback_url: params.callbackUrl } : {}),
     }),
   });
 

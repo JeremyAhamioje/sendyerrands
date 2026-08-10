@@ -13,6 +13,19 @@ import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from
 export const paymentsRouter = Router();
 
 /**
+ * Top-up bounds, in kobo.
+ *
+ * Deliberately small. Through testing, ₦10 stands in for ₦10,000: the flow
+ * exercised is identical and the amount at risk is not.
+ *
+ * The maximum is a safety rail rather than a product limit. It is the
+ * difference between a fat-fingered demo and a real ₦100,000 charge on the day
+ * the live keys go in. Raise it when the wallet is something customers use.
+ */
+const TOPUP_MIN_KOBO = 1_000; // ₦10
+const TOPUP_MAX_KOBO = 100_000; // ₦1,000
+
+/**
  * POST /payments/checkout
  *
  * WALLET  → debits immediately and places the order.
@@ -156,10 +169,20 @@ paymentsRouter.post(
 paymentsRouter.post(
   '/wallet/topup',
   requireAuth('customer'),
-  validate(z.object({ amountKobo: z.number().int().min(10_000) })),
+  validate(
+    z.object({
+      amountKobo: z
+        .number()
+        .int()
+        .min(TOPUP_MIN_KOBO, 'The smallest top-up is ₦10.')
+        .max(TOPUP_MAX_KOBO, 'The largest top-up is ₦1,000 while the wallet is in testing.'),
+      // The app's own deep link, so Paystack closes the sheet on its way back.
+      callbackUrl: z.string().max(300).optional(),
+    })
+  ),
   asyncHandler(async (req, res) => {
     const customerId = req.auth!.id;
-    const { amountKobo } = req.body as { amountKobo: number };
+    const { amountKobo, callbackUrl } = req.body as { amountKobo: number; callbackUrl?: string };
 
     const user = await prisma.user.findUnique({
       where: { id: customerId },
@@ -171,10 +194,85 @@ paymentsRouter.post(
       email: user?.email ?? `${user?.phone?.replace('+', '')}@sendy.app`,
       amountKobo,
       reference,
+      // Read back on verify to prove this reference is a top-up, and whose.
       metadata: { kind: 'wallet_topup', customerId },
+      callbackUrl,
     });
 
     res.json({ data: { authorizationUrl: init.authorization_url, reference } });
+  })
+);
+
+/**
+ * POST /payments/wallet/verify — settles a top-up from the app's side.
+ *
+ * The webhook cannot be the only way a top-up credits. Paystack calls it from
+ * the public internet, so it never reaches a laptop on localhost, and it is
+ * delayed whenever the API is asleep. Relying on it alone means a customer pays
+ * and watches an unchanged balance.
+ *
+ * So the app calls this when the payment sheet closes, however it closed. The
+ * amount credited comes from Paystack's own record of the transaction, never
+ * from the client, and `creditWallet` is idempotent on the reference — whether
+ * this runs before, after, or at the same time as the webhook, the money lands
+ * exactly once.
+ */
+paymentsRouter.post(
+  '/wallet/verify',
+  requireAuth('customer'),
+  validate(z.object({ reference: z.string().min(1) })),
+  asyncHandler(async (req, res) => {
+    const customerId = req.auth!.id;
+    const { reference } = req.body as { reference: string };
+
+    const balanceOf = async () =>
+      (
+        await prisma.user.findUnique({
+          where: { id: customerId },
+          select: { walletBalanceKobo: true },
+        })
+      )?.walletBalanceKobo ?? 0;
+
+    // Already credited, by the webhook or an earlier call. Answer without
+    // troubling Paystack — this endpoint gets hit on every sheet dismissal.
+    const settled = await prisma.walletTransaction.findFirst({
+      where: { reference, userId: customerId },
+    });
+    if (settled) {
+      return res.json({
+        data: { status: 'SUCCESS', creditedKobo: settled.amountKobo, balanceKobo: await balanceOf() },
+      });
+    }
+
+    const result = await verifyTransaction(reference);
+
+    /**
+     * The reference must be a top-up that this customer started.
+     *
+     * Without this, anyone could quote a reference they saw elsewhere and, in
+     * the window before the webhook lands, have someone else's payment credited
+     * to their own wallet. `notFound` rather than `forbidden` so the endpoint
+     * cannot be used to test whether a reference exists.
+     */
+    if (result.metadata?.kind !== 'wallet_topup' || result.metadata?.customerId !== customerId) {
+      throw notFound('Payment');
+    }
+
+    if (result.status !== 'success') {
+      return res.json({
+        data: {
+          status: result.status === 'abandoned' ? 'ABANDONED' : 'FAILED',
+          creditedKobo: 0,
+          balanceKobo: await balanceOf(),
+        },
+      });
+    }
+
+    await creditWallet(reference, { amount: result.amount, metadata: result.metadata });
+
+    res.json({
+      data: { status: 'SUCCESS', creditedKobo: result.amount, balanceKobo: await balanceOf() },
+    });
   })
 );
 

@@ -146,6 +146,23 @@ export const paymentsApi = {
     ),
   verify: (reference: string, token: string) =>
     api.post<{ status: string; orderId: string }>('/payments/verify', { reference }, token),
+
+  topup: (amountKobo: number, callbackUrl: string, token: string) =>
+    api.post<{ authorizationUrl: string; reference: string }>(
+      '/payments/wallet/topup',
+      { amountKobo, callbackUrl },
+      token
+    ),
+
+  /** Settles a top-up once the payment sheet closes. Safe to call repeatedly. */
+  verifyTopup: (reference: string, token: string) =>
+    api.post<TopupResult>('/payments/wallet/verify', { reference }, token),
+};
+
+export type TopupResult = {
+  status: 'SUCCESS' | 'FAILED' | 'ABANDONED';
+  creditedKobo: number;
+  balanceKobo: number;
 };
 
 export const marketplaceApi = {
