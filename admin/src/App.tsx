@@ -10,6 +10,7 @@ import { Orders } from '@/pages/Orders';
 import { Requests } from '@/pages/Requests';
 import { Riders } from '@/pages/Riders';
 import { Applications } from '@/pages/Applications';
+import { Payouts } from '@/pages/Payouts';
 import { Vendors } from '@/pages/Vendors';
 
 /**
@@ -53,6 +54,7 @@ function Shell() {
         <Route path="/requests" element={<Requests />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/applications" element={<Applications />} />
+        <Route path="/payouts" element={<Payouts />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

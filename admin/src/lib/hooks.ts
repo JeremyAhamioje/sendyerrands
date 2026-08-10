@@ -7,6 +7,8 @@ import type {
   OrderDetail,
   OrderListItem,
   OrderStatus,
+  Payout,
+  PayoutsPage,
   Rider,
   RiderStatus,
   Vendor,
@@ -220,5 +222,35 @@ export function useInviteVendors() {
         body: { vendorIds: vars.vendorIds },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['requests'] }),
+  });
+}
+
+export function usePayouts() {
+  return useQuery({
+    queryKey: ['payouts'],
+    queryFn: () => api<PayoutsPage>('/admin/payouts'),
+    // Transfers settle asynchronously, so a PROCESSING row becomes SUCCESS
+    // without anyone touching the page.
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSendPayout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { riderId: string; ignoreMinimum?: boolean }) =>
+      api<{ reference: string; amountKobo: number; status: string }>(
+        `/admin/riders/${vars.riderId}/payout`,
+        { method: 'POST', body: { ignoreMinimum: vars.ignoreMinimum ?? false } }
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payouts'] }),
+  });
+}
+
+export function useReconcilePayout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<Payout>(`/admin/payouts/${id}/reconcile`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payouts'] }),
   });
 }

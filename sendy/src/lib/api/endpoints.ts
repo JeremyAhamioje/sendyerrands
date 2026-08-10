@@ -255,10 +255,26 @@ export const riderApi = {
 
   earnings: (range: 'today' | 'week' | 'month', token: string) =>
     api.get<{
-      availableKobo: number; totalKobo: number; trips: number; rating: number;
+      availableKobo: number; payableKobo: number; heldKobo: number;
+      holdHours: number; minimumKobo: number;
+      totalKobo: number; trips: number; rating: number;
       series: { day: string; valueKobo: number }[];
       earnings: { id: string; grossKobo: number; commissionKobo: number; netKobo: number; createdAt: string }[];
     }>(`/rider/earnings?range=${range}`, token),
+
+  payouts: (token: string) => api.get<ApiPayout[]>('/rider/payouts', token),
+};
+
+export type ApiPayout = {
+  id: string;
+  amountKobo: number;
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'REVERSED';
+  reference: string;
+  bankName: string | null;
+  bankAccountNo: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  settledAt: string | null;
 };
 
 export const uploadsApi = {

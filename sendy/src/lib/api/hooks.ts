@@ -485,6 +485,13 @@ export function useRiderEarnings(range: 'today' | 'week' | 'month' = 'week') {
       const e = await riderApi.earnings(range, token!);
       return {
         available: koboToNaira(e.availableKobo),
+        // What a payout would actually send now, versus what is still ageing
+        // through the hold. One number for both made "available" a promise the
+        // payout rules would not keep.
+        payable: koboToNaira(e.payableKobo),
+        held: koboToNaira(e.heldKobo),
+        holdHours: e.holdHours,
+        minimum: koboToNaira(e.minimumKobo),
         total: koboToNaira(e.totalKobo),
         trips: e.trips,
         rating: e.rating,
@@ -494,6 +501,15 @@ export function useRiderEarnings(range: 'today' | 'week' | 'month' = 'week') {
         })),
       };
     },
+    enabled: Boolean(token),
+  });
+}
+
+export function useRiderPayouts() {
+  const { token } = useApp();
+  return useQuery({
+    queryKey: ['rider-payouts'],
+    queryFn: () => riderApi.payouts(token!),
     enabled: Boolean(token),
   });
 }

@@ -215,3 +215,40 @@ export type VendorApplication = {
   applicant: { id: string; firstName: string; lastName: string; phone: string } | null;
   vendor: { id: string; name: string; slug: string } | null;
 };
+
+export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'REVERSED';
+
+export type Payout = {
+  id: string;
+  amountKobo: number;
+  status: PayoutStatus;
+  reference: string;
+  bankName: string | null;
+  bankAccountNo: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  settledAt: string | null;
+  rider: { firstName: string; lastName: string; phone: string };
+  _count: { earnings: number };
+};
+
+/** A rider with unpaid work, and how much of it is actually sendable. */
+export type PayoutDue = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  bankName: string | null;
+  bankAccountNo: string | null;
+  bankAccountName: string | null;
+  payableKobo: number;
+  heldKobo: number;
+  meetsMinimum: boolean;
+};
+
+export type PayoutsPage = {
+  holdHours: number;
+  minimumKobo: number;
+  due: PayoutDue[];
+  payouts: Payout[];
+};
