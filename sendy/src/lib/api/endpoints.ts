@@ -147,10 +147,10 @@ export const ordersApi = {
 };
 
 export const paymentsApi = {
-  checkout: (orderId: string, method: 'WALLET' | 'PAYSTACK', token: string) =>
+  checkout: (orderId: string, method: 'WALLET' | 'PAYSTACK', callbackUrl: string, token: string) =>
     api.post<{ method: string; status: string; walletBalanceKobo?: number; authorizationUrl?: string; reference?: string }>(
       '/payments/checkout',
-      { orderId, method },
+      { orderId, method, callbackUrl },
       token
     ),
   verify: (reference: string, token: string) =>

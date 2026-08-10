@@ -140,20 +140,17 @@ export default function Checkout() {
             onPress={() => setPayment('wallet')}
           />
           <Divider className="mx-4" />
+          {/* One row, not "Debit card •••• 4291" and "Bank transfer" as two.
+              There is no saved card — that number was decoration — and both
+              rows opened the same Paystack page, which offers card, transfer
+              and USSD itself. Naming the destination is more honest than
+              implying we hold payment details we do not have. */}
           <OptionRow
             icon="card-outline"
-            title="Debit card"
-            subtitle="•••• 4291"
+            title="Card or bank transfer"
+            subtitle="Pay securely with Paystack"
             selected={payment === 'card'}
             onPress={() => setPayment('card')}
-          />
-          <Divider className="mx-4" />
-          <OptionRow
-            icon="swap-horizontal-outline"
-            title="Bank transfer"
-            subtitle="Pay via transfer"
-            selected={payment === 'transfer'}
-            onPress={() => setPayment('transfer')}
             last
           />
         </Card>

@@ -40,11 +40,18 @@ paymentsRouter.post(
     z.object({
       orderId: z.string().min(1),
       method: z.enum(['WALLET', 'PAYSTACK']),
+      // The app's own deep link, so Paystack returns the customer to the order
+      // instead of stranding them on the dashboard's callback page.
+      callbackUrl: z.string().max(300).optional(),
     })
   ),
   asyncHandler(async (req, res) => {
     const customerId = req.auth!.id;
-    const { orderId, method } = req.body as { orderId: string; method: 'WALLET' | 'PAYSTACK' };
+    const { orderId, method, callbackUrl } = req.body as {
+      orderId: string;
+      method: 'WALLET' | 'PAYSTACK';
+      callbackUrl?: string;
+    };
 
     const order = await prisma.order.findFirst({ where: { id: orderId, customerId } });
     if (!order) throw notFound('Order');
@@ -108,6 +115,7 @@ paymentsRouter.post(
       amountKobo: order.totalKobo,
       reference,
       metadata: { orderId: order.id, orderReference: order.reference, customerId },
+      callbackUrl,
     });
 
     const payment = await prisma.payment.create({

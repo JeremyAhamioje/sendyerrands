@@ -59,3 +59,53 @@ export async function loadSession(): Promise<StoredSession | null> {
 export async function clearSession() {
   await Promise.all([deleteItem(TOKEN_KEY), deleteItem(ACTOR_KEY)]);
 }
+
+/**
+ * A top-up that was started but not yet settled.
+ *
+ * On web the payment happens in the same tab, so the code that started it is
+ * gone by the time Paystack redirects back — there is nothing left in memory
+ * holding the reference. Parking it here lets the wallet screen pick it up on
+ * the next mount and ask the server what happened.
+ *
+ * Deliberately not cleared until the server gives a definitive answer: losing
+ * the reference means losing the only handle on a payment the customer made.
+ */
+const PENDING_TOPUP_KEY = 'sendy.wallet.pendingTopup';
+
+export async function savePendingTopup(reference: string) {
+  await setItem(PENDING_TOPUP_KEY, reference);
+}
+
+export async function getPendingTopup(): Promise<string | null> {
+  return getItem(PENDING_TOPUP_KEY);
+}
+
+export async function clearPendingTopup() {
+  await deleteItem(PENDING_TOPUP_KEY);
+}
+
+/** The same problem for an order paid by card, which also leaves the app. */
+const PENDING_PAYMENT_KEY = 'sendy.order.pendingPayment';
+
+export type PendingPayment = { reference: string; orderId: string };
+
+export async function savePendingPayment(pending: PendingPayment) {
+  await setItem(PENDING_PAYMENT_KEY, JSON.stringify(pending));
+}
+
+export async function getPendingPayment(): Promise<PendingPayment | null> {
+  const raw = await getItem(PENDING_PAYMENT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingPayment;
+  } catch {
+    // Unparseable means nothing recoverable is in there.
+    await deleteItem(PENDING_PAYMENT_KEY);
+    return null;
+  }
+}
+
+export async function clearPendingPayment() {
+  await deleteItem(PENDING_PAYMENT_KEY);
+}

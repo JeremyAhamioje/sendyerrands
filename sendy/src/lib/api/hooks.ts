@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as Linking from 'expo-linking';
@@ -9,6 +11,14 @@ import type { Vendor } from '@/lib/mock';
 import { useApp } from '@/store/app';
 
 import { uploadImage, type UploadFolder } from './uploads';
+import {
+  clearPendingPayment,
+  clearPendingTopup,
+  getPendingPayment,
+  getPendingTopup,
+  savePendingPayment,
+  savePendingTopup,
+} from './storage';
 
 import {
   marketplaceApi, meApi, ordersApi, paymentsApi, riderApi, vendorApi, vendorApplicationsApi, vendorsApi,
@@ -229,7 +239,7 @@ export function useCheckout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ orderId, method }: { orderId: string; method: 'WALLET' | 'PAYSTACK' }) =>
-      paymentsApi.checkout(orderId, method, token!),
+      paymentsApi.checkout(orderId, method, Linking.createURL('/payment-success'), token!),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['orders'] });
       // Paying moves the order off PENDING_PAYMENT — the tracking screen reads
@@ -287,17 +297,34 @@ export function useWallet() {
  * deserves the same answer as someone who waited for the redirect. The server
  * asks Paystack and credits idempotently, so calling this twice is harmless.
  */
+export type TopupOutcome = TopupResult | { status: 'REDIRECTING' };
+
 export function useTopUpWallet() {
   const { token } = useApp();
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (amountKobo: number): Promise<TopupResult> => {
+    mutationFn: async (amountKobo: number): Promise<TopupOutcome> => {
       const returnUrl = Linking.createURL('/wallet');
       const { authorizationUrl, reference } = await paymentsApi.topup(amountKobo, returnUrl, token!);
 
-      await WebBrowser.openAuthSessionAsync(authorizationUrl, returnUrl);
+      /**
+       * Web takes the whole tab; native gets the auth session.
+       *
+       * `openAuthSessionAsync` calls `window.open` on web, and by the time it
+       * runs the `await` above has already ended the user activation that
+       * authorised it — so the browser blocks the popup and the payment never
+       * opens. Redirecting the tab has no such restriction, and it is how web
+       * checkouts work anyway. The reference is parked first because this code
+       * will not be alive when Paystack sends the customer back.
+       */
+      if (Platform.OS === 'web') {
+        await savePendingTopup(reference);
+        window.location.assign(authorizationUrl);
+        return { status: 'REDIRECTING' };
+      }
 
+      await WebBrowser.openAuthSessionAsync(authorizationUrl, returnUrl);
       return paymentsApi.verifyTopup(reference, token!);
     },
     onSuccess: (result) => {
@@ -306,6 +333,127 @@ export function useTopUpWallet() {
       qc.invalidateQueries({ queryKey: ['me'] }); // the balance on Profile
     },
   });
+}
+
+/**
+ * Takes the customer to Paystack to pay for an order, then settles it.
+ *
+ * Same shape as the top-up, and for the same reason: web loses the tab, native
+ * keeps the auth session. The reference is parked before leaving so the
+ * confirmation screen can find out what happened without relying on being the
+ * same instance that started it.
+ */
+export function usePayForOrder() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      orderId: string;
+      reference: string;
+      authorizationUrl: string;
+    }): Promise<{ status: string; orderId: string } | { status: 'REDIRECTING' }> => {
+      await savePendingPayment({ reference: input.reference, orderId: input.orderId });
+
+      if (Platform.OS === 'web') {
+        window.location.assign(input.authorizationUrl);
+        return { status: 'REDIRECTING' };
+      }
+
+      await WebBrowser.openAuthSessionAsync(
+        input.authorizationUrl,
+        Linking.createURL('/payment-success')
+      );
+
+      const result = await paymentsApi.verify(input.reference, token!);
+      await clearPendingPayment();
+      return result;
+    },
+    onSuccess: (result) => {
+      if (result.status !== 'SUCCESS') return;
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order'] });
+    },
+  });
+}
+
+/** Settles an order payment that finished while the app was navigated away. */
+export function useSettleReturnedPayment() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  const [outcome, setOutcome] = useState<{ status: string; orderId: string } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    (async () => {
+      const pending = await getPendingPayment().catch(() => null);
+      if (!pending || cancelled) return;
+
+      try {
+        const result = await paymentsApi.verify(pending.reference, token);
+        await clearPendingPayment();
+        if (cancelled) return;
+
+        setOutcome(result);
+        qc.invalidateQueries({ queryKey: ['orders'] });
+        qc.invalidateQueries({ queryKey: ['order', pending.orderId] });
+      } catch {
+        // Left parked so the next mount can try again.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, qc]);
+
+  return outcome;
+}
+
+/**
+ * Settles a top-up that finished while the app was navigated away.
+ *
+ * Runs on mount and asks the server about any parked reference. The reference
+ * is only cleared once the server answers — a failed check leaves it in place
+ * so the next mount tries again, because dropping it would strand a payment
+ * the customer actually made.
+ */
+export function useSettleReturnedTopup() {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  const [outcome, setOutcome] = useState<TopupResult | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    (async () => {
+      const reference = await getPendingTopup().catch(() => null);
+      if (!reference || cancelled) return;
+
+      try {
+        const result = await paymentsApi.verifyTopup(reference, token);
+        await clearPendingTopup();
+        if (cancelled) return;
+
+        setOutcome(result);
+        if (result.status === 'SUCCESS') {
+          qc.invalidateQueries({ queryKey: ['wallet'] });
+          qc.invalidateQueries({ queryKey: ['me'] });
+        }
+      } catch {
+        // Left parked on purpose — see above.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, qc]);
+
+  return outcome;
 }
 
 // ── marketplace / bidding ───────────────────────────────────

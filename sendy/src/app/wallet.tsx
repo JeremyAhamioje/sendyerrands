@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { QueryError } from '@/components/ui/QueryError';
 import { Screen, ScreenHeader, StickyBar } from '@/components/ui/Screen';
 import { ApiError } from '@/lib/api/client';
-import { useTopUpWallet, useWallet } from '@/lib/api/hooks';
+import { useSettleReturnedTopup, useTopUpWallet, useWallet } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
 import { colors } from '@/lib/theme';
 
@@ -37,6 +37,10 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export default function Wallet() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useWallet();
   const [funding, setFunding] = useState(false);
+
+  // On web the payment takes the whole tab, so a top-up finishes with this
+  // screen freshly mounted and no memory of having started one.
+  const returned = useSettleReturnedTopup();
 
   const balance = data?.balance ?? 0;
   const transactions = data?.transactions ?? [];
@@ -91,6 +95,33 @@ export default function Wallet() {
           Withdrawals to a bank account aren&apos;t live yet. Refunds land here instantly and can be
           spent on any order.
         </Text>
+
+        {/* The outcome of a payment made in another tab. Without this the
+            customer comes back to a screen that says nothing about what just
+            happened to their money. */}
+        {returned ? (
+          <View
+            className={`rounded-lg p-4 mt-4 ${returned.status === 'SUCCESS' ? 'bg-success/10' : 'bg-surface'}`}
+          >
+            <View className="flex-row items-center">
+              <Ionicons
+                name={returned.status === 'SUCCESS' ? 'checkmark-circle' : 'information-circle-outline'}
+                size={18}
+                color={returned.status === 'SUCCESS' ? colors.success : colors.muted}
+              />
+              <Text className="text-ink text-[14px] font-semibold ml-2">
+                {returned.status === 'SUCCESS'
+                  ? `${naira(returned.creditedKobo / 100)} added to your wallet`
+                  : returned.status === 'ABANDONED'
+                    ? 'That payment was not completed'
+                    : "That payment didn't go through"}
+              </Text>
+            </View>
+            {returned.status !== 'SUCCESS' ? (
+              <Text className="text-muted text-[13px] mt-1">Nothing was charged.</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <Text className="text-muted text-[13px] font-semibold mt-6 mb-2.5">TRANSACTIONS</Text>
 
@@ -178,6 +209,9 @@ function TopUpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     setProblem(null);
     try {
       const result = await topUp.mutateAsync(amountKobo);
+      // On web the tab is already navigating to Paystack; there is no outcome
+      // to report and the screen is about to be replaced.
+      if (result.status === 'REDIRECTING') return;
       if (result.status === 'SUCCESS') return close();
 
       setProblem(
@@ -186,8 +220,14 @@ function TopUpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           : "That payment didn't go through. Nothing was charged."
       );
     } catch (err) {
+      // The underlying message is kept rather than swallowed: "Could not start
+      // the payment" on its own sent us looking at the server for a failure
+      // that was entirely in the browser.
+      const detail = err instanceof Error ? err.message : '';
       setProblem(
-        err instanceof ApiError ? err.message : 'Could not start the payment. Try again.'
+        err instanceof ApiError
+          ? err.message
+          : `Could not start the payment.${detail ? ` ${detail}` : ''}`
       );
     }
   }
