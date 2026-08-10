@@ -4,7 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ApiError } from '@/lib/api/client';
 import { authApi, meApi, type ApiAddress, type ApiUser } from '@/lib/api/endpoints';
 import { koboToNaira } from '@/lib/api/mappers';
-import { clearSession, loadSession, saveSession } from '@/lib/api/storage';
+import {
+  clearCartWeb,
+  clearSession,
+  loadCartWeb,
+  loadSession,
+  saveCartWeb,
+  saveSession,
+} from '@/lib/api/storage';
 import type { Thumb } from '@/lib/mock';
 
 /**
@@ -67,8 +74,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [actor, setActor] = useState<'customer' | 'rider' | 'vendor'>('customer');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [vendorId, setVendorId] = useState<string | null>(null);
+  /**
+   * The cart is restored synchronously on web so it is already there for the
+   * first render — a checkout screen that flashes empty and then fills in is
+   * worse than one that is simply correct. `useState`'s initialiser runs once,
+   * which is exactly the semantics wanted.
+   */
+  const [cart, setCart] = useState<CartLine[]>(() => restoreCart().lines);
+  const [vendorId, setVendorId] = useState<string | null>(() => restoreCart().vendorId);
   const [vendorFees, setVendorFees] = useState<{ deliveryFee: number; freeOver?: number }>({
     deliveryFee: 1300,
   });
@@ -183,6 +196,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setCart([]), []);
 
+  // Mirror every cart change to storage so a reload — or the round trip through
+  // Paystack, which is a full page load on web — picks up where it left off.
+  useEffect(() => {
+    if (cart.length === 0 && vendorId === null) clearCartWeb();
+    else saveCartWeb(JSON.stringify({ lines: cart, vendorId }));
+  }, [cart, vendorId]);
+
   const value = useMemo<AppState>(() => {
     const subtotal = cart.reduce((sum, l) => sum + l.price * l.qty, 0);
     const qualifiesFree = Boolean(vendorFees.freeOver && subtotal >= vendorFees.freeOver);
@@ -225,6 +245,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+/**
+ * Reads the persisted cart. Returns an empty one on native, or on anything
+ * unparseable — a corrupt cart is not worth a crash on launch.
+ */
+function restoreCart(): { lines: CartLine[]; vendorId: string | null } {
+  const raw = loadCartWeb();
+  if (!raw) return { lines: [], vendorId: null };
+  try {
+    const parsed = JSON.parse(raw) as { lines?: CartLine[]; vendorId?: string | null };
+    return { lines: parsed.lines ?? [], vendorId: parsed.vendorId ?? null };
+  } catch {
+    clearCartWeb();
+    return { lines: [], vendorId: null };
+  }
 }
 
 /** Tiny helper: a ref that always mirrors the latest value. */

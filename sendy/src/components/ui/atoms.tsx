@@ -159,11 +159,22 @@ export function ListRow({
   danger?: boolean;
   last?: boolean;
 }) {
+  /**
+   * The chevron is drawn only when there is somewhere to go.
+   *
+   * It used to render unconditionally, which turned every `onPress`-less row
+   * into a control that advertised itself as tappable and then did nothing —
+   * indistinguishable, from the outside, from a broken button. A row without a
+   * destination is a label, and now looks like one.
+   */
+  const tappable = Boolean(onPress);
+
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
-      className={`flex-row items-center px-4 py-3.5 active:bg-surface ${
+      disabled={!tappable}
+      accessibilityRole={tappable ? 'button' : 'text'}
+      className={`flex-row items-center px-4 py-3.5 ${tappable ? 'active:bg-surface' : ''} ${
         last ? '' : 'border-b border-hairline'
       }`}
     >
@@ -172,7 +183,7 @@ export function ListRow({
       </View>
       <Text className={`flex-1 text-[15px] ${danger ? 'text-error' : 'text-ink'}`}>{label}</Text>
       {value ? <Text className="text-muted text-[13px] mr-2">{value}</Text> : null}
-      <Ionicons name="chevron-forward" size={17} color={colors.muted} />
+      {tappable ? <Ionicons name="chevron-forward" size={17} color={colors.muted} /> : null}
     </Pressable>
   );
 }

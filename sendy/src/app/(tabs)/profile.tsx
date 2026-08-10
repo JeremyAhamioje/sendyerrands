@@ -92,7 +92,12 @@ export default function Profile() {
             value={`${addresses.length}`}
             onPress={() => router.push('/addresses')}
           />
-          <ListRow icon="card-outline" label="Payment methods" value="2 cards" />
+          {/* "Payment methods · 2 cards" used to sit here. There were no cards:
+              Sendy Errands never stores them, Paystack collects them per
+              payment and we only keep the reference. A row promising a card
+              wallet we do not have, opening nothing, was worse than its
+              absence — the Wallet above is the one payment method there is
+              anything to manage. */}
           <ListRow icon="receipt-outline" label="Order history" onPress={() => router.push('/(tabs)/orders')} />
           <ListRow
             icon="heart-outline"
@@ -102,12 +107,10 @@ export default function Profile() {
           />
         </Card>
 
-        <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">PREFERENCES</Text>
-        <Card className="mx-4 overflow-hidden">
-          <ListRow icon="notifications-outline" label="Notifications" />
-          <ListRow icon="language-outline" label="Language" value="English" />
-          <ListRow icon="shield-checkmark-outline" label="Privacy & security" last />
-        </Card>
+        {/* PREFERENCES held Notifications, Language and Privacy & security.
+            All three were labels with chevrons and no destination: push is not
+            enabled, there is one language, and nothing sits behind privacy yet.
+            They come back when they lead somewhere. */}
 
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">MORE</Text>
         <Card className="mx-4 overflow-hidden">

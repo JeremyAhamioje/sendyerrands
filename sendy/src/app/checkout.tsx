@@ -49,6 +49,10 @@ export default function Checkout() {
       });
 
       if (result.authorizationUrl) {
+        // The order now exists server-side and carries the items, so the cart
+        // has done its job. Left alone, it survived the payment and the next
+        // checkout re-ordered everything.
+        clearCart();
         // Card/transfer: hand off to Paystack, then verify on return.
         router.push({ pathname: '/payment-success', params: { reference: result.reference, url: result.authorizationUrl } });
         return;

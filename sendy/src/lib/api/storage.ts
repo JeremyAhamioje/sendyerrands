@@ -109,3 +109,28 @@ export async function getPendingPayment(): Promise<PendingPayment | null> {
 export async function clearPendingPayment() {
   await deleteItem(PENDING_PAYMENT_KEY);
 }
+
+/**
+ * The cart, on web only.
+ *
+ * Paying by card navigates the whole tab away and back, which is a full page
+ * load — and the cart lives in React state, so it does not survive one. Neither
+ * does an accidental refresh. On native the app stays alive across the payment
+ * sheet, so there is nothing to rescue.
+ *
+ * Web only also sidesteps SecureStore, which is for secrets and caps values at
+ * about 2KB on Android. A cart is neither secret nor reliably small.
+ */
+const CART_KEY = 'sendy.cart';
+
+export function saveCartWeb(json: string) {
+  if (isWeb) globalThis.localStorage?.setItem(CART_KEY, json);
+}
+
+export function loadCartWeb(): string | null {
+  return isWeb ? (globalThis.localStorage?.getItem(CART_KEY) ?? null) : null;
+}
+
+export function clearCartWeb() {
+  if (isWeb) globalThis.localStorage?.removeItem(CART_KEY);
+}

@@ -150,8 +150,14 @@ export default function RiderMe() {
         {/* settings */}
         <Text className="text-muted text-[13px] font-semibold px-4 mt-6 mb-2">SETTINGS</Text>
         <Card className="mx-4 overflow-hidden">
-          <ListRow icon="notifications-outline" label="Job alerts" value="On" />
-          <ListRow icon="headset-outline" label="Rider support" />
+          {/* "Job alerts · On" claimed a push notification that does not exist
+              yet — the least helpful thing to be wrong about for someone
+              waiting on work. It returns when notifications are actually sent. */}
+          <ListRow
+            icon="headset-outline"
+            label="Rider support"
+            onPress={() => router.push('/help')}
+          />
           {/*
             Signs out on the way across. The app holds one session at a time and
             this is a rider token, so simply navigating to the customer tabs put
