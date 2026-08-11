@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { env, features } from '@/config/env';
-import { AppError, badRequest } from '@/lib/errors';
+import { AppError, badRequest, tooMany } from '@/lib/errors';
 
 /**
  * Paystack (https://paystack.com) — cards, bank transfer and USSD in Naira.
@@ -79,10 +79,15 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const payload = (await res.json().catch(() => null)) as (T & { message?: string }) | null;
 
   if (!res.ok) {
+    // The upstream status travels with the error. Callers need it to tell a
+    // genuine rejection from a rate limit or an outage, which read identically
+    // once flattened into one message but mean completely different things to
+    // whoever is staring at the screen.
     throw new AppError(
       502,
       'PAYSTACK_ERROR',
-      payload?.message ?? 'The payment provider rejected that request.'
+      payload?.message ?? 'The payment provider rejected that request.',
+      { upstreamStatus: res.status }
     );
   }
 
@@ -195,15 +200,34 @@ export async function resolveAccount(accountNumber: string, bankCode: string) {
     );
     return { accountNumber: body.data.account_number, accountName: body.data.account_name };
   } catch (err) {
-    // Paystack answers a wrong number with a 4xx, which paystackFetch turns
-    // into a 502. That reads as "our provider is broken" when the truth is
-    // "check the digits", so it is worth restating.
-    if (err instanceof AppError && err.code === 'PAYSTACK_ERROR') {
-      throw badRequest(
-        'We could not find that account. Check the number and the bank, then try again.'
+    if (!(err instanceof AppError) || err.code !== 'PAYSTACK_ERROR') throw err;
+
+    /**
+     * Only blame the digits when the bank actually rejected them.
+     *
+     * This used to turn every upstream failure into "we could not find that
+     * account" — including rate limits and outages. Someone typing their own
+     * account number correctly was told it was wrong, which is the worst
+     * possible answer: it is confidently incorrect, and it sends them checking
+     * something that was never the problem.
+     */
+    const status = (err.details as { upstreamStatus?: number } | undefined)?.upstreamStatus;
+    console.error(`[paystack] account resolve failed (upstream ${status}): ${err.message}`);
+
+    if (status === 429) {
+      throw tooMany('Too many account checks in a row. Wait a few seconds and try again.');
+    }
+    if (status !== undefined && status >= 500) {
+      throw new AppError(
+        503,
+        'BANK_LOOKUP_UNAVAILABLE',
+        "We couldn't reach your bank to check that account. Nothing is wrong with your details — try again in a moment."
       );
     }
-    throw err;
+
+    throw badRequest(
+      'We could not find that account. Check the number and the bank, then try again.'
+    );
   }
 }
 
