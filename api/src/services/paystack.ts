@@ -193,12 +193,43 @@ export async function listBanks(): Promise<Bank[]> {
  * recoverable by us — it is a bank dispute, and the money is gone in the
  * meantime.
  */
+/**
+ * Recently resolved accounts.
+ *
+ * Saving a payout account deliberately resolves a second time rather than
+ * trusting a name posted alongside a number — but that put two lookups seconds
+ * apart for one account, and Paystack rate-limits this endpoint. The result was
+ * that confirming a correct account reliably failed with "too many checks",
+ * immediately after showing the right name.
+ *
+ * Caching keeps the security property intact: the stored name still comes from
+ * Paystack and never from the client. It just does not ask twice for an answer
+ * it already has.
+ */
+const resolveCache = new Map<string, { at: number; value: { accountNumber: string; accountName: string } }>();
+const RESOLVE_TTL_MS = 5 * 60 * 1000;
+const RESOLVE_CACHE_MAX = 500;
+
 export async function resolveAccount(accountNumber: string, bankCode: string) {
+  const key = `${bankCode}:${accountNumber}`;
+  const hit = resolveCache.get(key);
+  if (hit && Date.now() - hit.at < RESOLVE_TTL_MS) return hit.value;
+
   try {
     const body = await paystackFetch<ResolveResponse>(
       `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`
     );
-    return { accountNumber: body.data.account_number, accountName: body.data.account_name };
+    const value = { accountNumber: body.data.account_number, accountName: body.data.account_name };
+
+    // Oldest-first eviction, so a long-running process cannot grow this
+    // without bound. Map preserves insertion order, which is all that is needed.
+    if (resolveCache.size >= RESOLVE_CACHE_MAX) {
+      const oldest = resolveCache.keys().next().value;
+      if (oldest !== undefined) resolveCache.delete(oldest);
+    }
+    resolveCache.set(key, { at: Date.now(), value });
+
+    return value;
   } catch (err) {
     if (!(err instanceof AppError) || err.code !== 'PAYSTACK_ERROR') throw err;
 
@@ -215,7 +246,17 @@ export async function resolveAccount(accountNumber: string, bankCode: string) {
     console.error(`[paystack] account resolve failed (upstream ${status}): ${err.message}`);
 
     if (status === 429) {
-      throw tooMany('Too many account checks in a row. Wait a few seconds and try again.');
+      /**
+       * Paystack's own wording, not ours.
+       *
+       * The limit here is not what "rate limited" usually means: test mode
+       * allows three real bank resolves *per day*, and says so, pointing at
+       * test bank code 001 for unlimited checks. A generic "wait a few seconds"
+       * would have someone retrying for hours against a cap that resets at
+       * midnight. When the provider's message is more specific than anything we
+       * can infer, it is the better message.
+       */
+      throw tooMany(err.message || 'Too many account checks. Try again later.');
     }
     if (status !== undefined && status >= 500) {
       throw new AppError(
