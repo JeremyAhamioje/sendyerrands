@@ -44,22 +44,18 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 
-  /** True when re-authenticating is the fix. */
+  /**
+   * True when the token itself is dead and re-authenticating is the fix.
+   *
+   * Deliberately 401 only. There used to be a `needsSignIn` getter that also
+   * counted 403, and every caller treated it as grounds for signing out — but
+   * 403 means the token is valid and belongs to a different kind of account.
+   * Discarding a working session over one is destructive, and it read to users
+   * as the app logging them out at random. Retrying cannot fix a 403 either, so
+   * screens handle it separately; nothing should collapse the two again.
+   */
   get isAuthError() {
     return this.status === 401;
-  }
-
-  /**
-   * True when the request was rejected because of who is signed in, rather than
-   * anything to do with the network.
-   *
-   * 403 means the token is valid but belongs to the wrong kind of account — a
-   * rider token on a customer endpoint, say. Retrying can never fix either
-   * case, so screens must offer signing in again instead of a Retry button
-   * that will fail identically every time.
-   */
-  get needsSignIn() {
-    return this.status === 401 || this.status === 403;
   }
 }
 

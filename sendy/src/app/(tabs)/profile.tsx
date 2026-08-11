@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -132,7 +133,16 @@ export default function Profile() {
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>
 
-        <Text className="text-muted text-[11px] text-center mt-7">Sendy Errands v1.0.0 (MVP)</Text>
+        {/* Was a hardcoded "v1.0.0 (MVP)" — the same string in every build ever
+            shipped, so no bug report could establish what the reporter was
+            running. Diagnostics reads it from the running build instead. */}
+        <Text
+          onPress={() => router.push('/diagnostics')}
+          accessibilityRole="button"
+          className="text-muted text-[11px] text-center mt-7"
+        >
+          Sendy Errands {Constants.expoConfig?.version ?? ''} · Diagnostics
+        </Text>
       </ScrollView>
     </Screen>
   );

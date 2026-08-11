@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ApiError } from '@/lib/api/client';
 import { authApi, meApi, type ApiAddress, type ApiUser } from '@/lib/api/endpoints';
 import { koboToNaira } from '@/lib/api/mappers';
+import { markSessionPersistFailed, recordAuth } from '@/lib/diagnostics';
 import {
   clearCartWeb,
   clearSession,
@@ -109,14 +110,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      recordAuth('restore.start');
+
       // A SecureStore read can itself throw (keystore reset, restored backup).
       // That is a real signed-out state; anything else is not.
-      const stored = await loadSession().catch(() => null);
+      const stored = await loadSession().catch((err) => {
+        recordAuth('restore.read-failed', err instanceof Error ? err.message : String(err));
+        return null;
+      });
       if (cancelled) return;
 
       if (stored) {
         setToken(stored.token);
         setActor(stored.actor);
+        recordAuth('restore.found', stored.actor);
+      } else {
+        recordAuth('restore.empty');
       }
       setReady(true);
       if (!stored) return;
@@ -125,11 +134,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Also the authoritative answer on actor, which matters when the stored
         // value is older than the app's understanding of the roles.
         const session = await authApi.session(stored.token);
-        if (!cancelled) setActor(session.actor);
+        if (cancelled) return;
+        setActor(session.actor);
+        recordAuth('verify.ok', session.actor);
       } catch (err) {
         // ONLY 401 means the token is dead. A timeout or a 5xx means the API
         // was asleep or unreachable, which the user cannot fix by signing in.
-        if (cancelled || !(err instanceof ApiError) || !err.isAuthError) return;
+        if (cancelled) return;
+        if (!(err instanceof ApiError) || !err.isAuthError) {
+          recordAuth(
+            'verify.failed-kept-session',
+            err instanceof ApiError ? `${err.status} ${err.code}` : 'unknown'
+          );
+          return;
+        }
+        recordAuth('verify.401-signed-out');
         await clearSession();
         setToken(null);
         setActor('customer');
@@ -157,14 +176,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (newToken: string, newActor: 'customer' | 'rider' | 'vendor' = 'customer') => {
-      await saveSession({ token: newToken, actor: newActor });
+      /**
+       * State first, storage second.
+       *
+       * This used to `await saveSession(...)` before setting either piece of
+       * state, so a SecureStore write that threw took the whole sign-in down
+       * with it: the caller's await rejected, the navigation that follows it
+       * never ran, and someone who had just typed a correct code was left
+       * sitting on the OTP screen with no error. Letting them into the app on a
+       * token the server already issued is strictly better, and the failure is
+       * recorded rather than swallowed — it is why they will be signed out at
+       * the next launch, and the Diagnostics screen can now say so.
+       */
       setToken(newToken);
       setActor(newActor);
+
+      try {
+        await saveSession({ token: newToken, actor: newActor });
+        recordAuth('signin.ok', newActor);
+      } catch (err) {
+        markSessionPersistFailed();
+        recordAuth('signin.persist-failed', err instanceof Error ? err.message : String(err));
+        console.warn('[auth] session could not be persisted; it will not survive a restart', err);
+      }
     },
     []
   );
 
   const signOut = useCallback(async () => {
+    recordAuth('signout.manual');
     await clearSession();
     setToken(null);
     setCart([]);

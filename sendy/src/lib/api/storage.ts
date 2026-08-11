@@ -10,8 +10,24 @@ import { Platform } from 'react-native';
  * a shipping target.
  */
 
-const TOKEN_KEY = 'sendy.auth.token';
-const ACTOR_KEY = 'sendy.auth.actor';
+/**
+ * One entry, not two.
+ *
+ * The token and the actor used to be written as separate SecureStore keys under
+ * a `Promise.all`. Two writes can half-succeed: a token stored with no actor
+ * reads back as `customer` on the next launch, because that is the fallback. A
+ * rider or vendor in that state carries a perfectly valid token into the
+ * customer app, where every endpoint answers 403 — and the app then tells them
+ * their session expired and offers to sign them out. One value cannot tear.
+ */
+const SESSION_KEY = 'sendy.auth.session';
+
+/**
+ * The previous split keys, still read once so an upgrade does not sign everyone
+ * out. Deleting this migration is exactly the bug it exists to prevent.
+ */
+const LEGACY_TOKEN_KEY = 'sendy.auth.token';
+const LEGACY_ACTOR_KEY = 'sendy.auth.actor';
 
 const isWeb = Platform.OS === 'web';
 
@@ -42,22 +58,46 @@ export type StoredSession = { token: string; actor: Actor };
 const ACTORS: Actor[] = ['customer', 'rider', 'vendor'];
 
 export async function saveSession(session: StoredSession) {
-  await Promise.all([setItem(TOKEN_KEY, session.token), setItem(ACTOR_KEY, session.actor)]);
+  await setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export async function loadSession(): Promise<StoredSession | null> {
-  const [token, actor] = await Promise.all([getItem(TOKEN_KEY), getItem(ACTOR_KEY)]);
+  const raw = await getItem(SESSION_KEY).catch(() => null);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<StoredSession>;
+      // Checked against the list rather than `=== 'rider' ? … : 'customer'`,
+      // which silently downgraded every restored vendor session to a customer
+      // one: the vendor token then 403'd on every customer endpoint and the app
+      // told them to sign in again, on every launch, forever.
+      if (parsed.token) {
+        return { token: parsed.token, actor: ACTORS.find((a) => a === parsed.actor) ?? 'customer' };
+      }
+    } catch {
+      // Unparseable: fall through to the legacy keys rather than assume there is
+      // no session. Guessing "signed out" here is the expensive direction.
+    }
+  }
+
+  const [token, actor] = await Promise.all([
+    getItem(LEGACY_TOKEN_KEY).catch(() => null),
+    getItem(LEGACY_ACTOR_KEY).catch(() => null),
+  ]);
   if (!token) return null;
 
-  // Checked against the list rather than `=== 'rider' ? … : 'customer'`, which
-  // silently downgraded every restored vendor session to a customer one: the
-  // vendor token then 403'd on every customer endpoint and the app told them
-  // to sign in again, on every launch, forever.
-  return { token, actor: ACTORS.find((a) => a === actor) ?? 'customer' };
+  const migrated: StoredSession = { token, actor: ACTORS.find((a) => a === actor) ?? 'customer' };
+  // Best effort. Failing to migrate costs one more legacy read next launch,
+  // which is survivable; throwing here would not be.
+  await saveSession(migrated).catch(() => {});
+  return migrated;
 }
 
 export async function clearSession() {
-  await Promise.all([deleteItem(TOKEN_KEY), deleteItem(ACTOR_KEY)]);
+  await Promise.all(
+    [deleteItem(SESSION_KEY), deleteItem(LEGACY_TOKEN_KEY), deleteItem(LEGACY_ACTOR_KEY)].map((p) =>
+      p.catch(() => {})
+    )
+  );
 }
 
 /**
