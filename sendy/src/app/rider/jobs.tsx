@@ -1,69 +1,108 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { JobCard } from '@/components/JobCard';
-import { Badge, Chip } from '@/components/ui/atoms';
-import { IconButton } from '@/components/ui/Button';
+import { Badge, Chip, EmptyState, Skeleton } from '@/components/ui/atoms';
+import { QueryError } from '@/components/ui/QueryError';
 import { Screen } from '@/components/ui/Screen';
 import { useRiderJobs, useRiderMe } from '@/lib/api/hooks';
 import { colors } from '@/lib/theme';
 
-const FILTERS = ['Nearest', 'Highest pay', 'All types'];
+/**
+ * Available jobs (design.md §10).
+ *
+ * The list used to be `const { data = [] } = useRiderJobs()` and nothing else,
+ * so a failed request, a request still in flight and a genuinely empty board
+ * all rendered the same blank screen. A rider whose fetch timed out — which the
+ * API being asleep makes routine — saw "no work available" and had no way to
+ * learn otherwise. Every one of those states now says which it is.
+ */
 
-/** Available jobs list (design.md §10) — distance, payout, type. */
+/**
+ * The API sorts by `createdAt` ascending for anything that is not `payout`.
+ * That is longest-waiting, not nearest: distance needs a maps provider the app
+ * does not have, and every job reports 0 km. Labelling it "Nearest" made the
+ * chip a no-op that looked like a feature.
+ */
+const FILTERS = ['Longest waiting', 'Highest pay'] as const;
+type Filter = (typeof FILTERS)[number];
+
 export default function RiderJobs() {
   const router = useRouter();
-  const [filter, setFilter] = useState('Nearest');
-  const { data: riderMe } = useRiderMe();
-  const { data: RIDER_JOBS = [] } = useRiderJobs(filter === 'Highest pay' ? 'payout' : 'nearest');
-  const RIDER = { zone: riderMe?.zone ?? 'Your area' };
+  const [filter, setFilter] = useState<Filter>('Longest waiting');
 
-  const jobs = [...RIDER_JOBS].sort((a, b) =>
-    filter === 'Highest pay' ? b.payout - a.payout : a.distanceKm - b.distanceKm
-  );
+  const { data: riderMe } = useRiderMe();
+  const { data: jobs = [], isLoading, isError, error, refetch, isRefetching } =
+    useRiderJobs(filter === 'Highest pay' ? 'payout' : 'nearest');
+
+  const online = riderMe?.isOnline ?? false;
 
   return (
     <Screen>
       <View className="flex-row items-center px-4 py-3">
         <Text className="text-ink text-[24px] font-display flex-1">Available jobs</Text>
-        <View className="mr-2">
-          <Badge label="Online" tone="success" icon="ellipse" />
-        </View>
-        <IconButton icon="options-outline" accessibilityLabel="Filters" />
+        {/* Reflects the toggle rather than always claiming Online, which told a
+            rider they were taking work while they were not. */}
+        <Badge
+          label={online ? 'Online' : 'Offline'}
+          tone={online ? 'success' : 'muted'}
+          icon="ellipse"
+        />
       </View>
 
       <View className="flex-row items-center px-4 pb-2">
         <Ionicons name="location-outline" size={14} color={colors.muted} />
         <Text className="text-muted text-[13px] ml-1.5">
-          {RIDER.zone} · {RIDER_JOBS.length} jobs within 5 km
+          {/* "within 5 km" was invented — nothing here filters by distance. */}
+          {riderMe?.zone ?? 'All areas'} · {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} open
         </Text>
       </View>
 
       <View className="py-2">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+        >
           {FILTERS.map((f) => (
-            <Chip
-              key={f}
-              label={f}
-              icon={f === 'Nearest' ? 'navigate-outline' : undefined}
-              selected={f === filter}
-              onPress={() => setFilter(f)}
-            />
+            <Chip key={f} label={f} selected={f === filter} onPress={() => setFilter(f)} />
           ))}
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
-        {jobs.map((job) => (
-          <JobCard
-            key={job.id}
-            job={job}
-            onPress={() => router.push({ pathname: '/rider-job/[id]', params: { id: job.id } })}
-            onAccept={() => router.push({ pathname: '/rider-job/[id]', params: { id: job.id } })}
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.pink[600]} />
+        }
+      >
+        {isLoading ? (
+          [0, 1, 2].map((i) => <Skeleton key={i} className="w-full h-[152px] mb-4" />)
+        ) : isError ? (
+          <QueryError error={error} onRetry={() => refetch()} noun="available jobs" />
+        ) : jobs.length === 0 ? (
+          <EmptyState
+            icon="cube-outline"
+            title="No jobs right now"
+            body={
+              online
+                ? 'New work appears here on its own — this list refreshes every 20 seconds. Pull down to check straight away.'
+                : 'Go online from your dashboard to start receiving jobs.'
+            }
           />
-        ))}
+        ) : (
+          jobs.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onPress={() => router.push({ pathname: '/rider-job/[id]', params: { id: job.id } })}
+              onAccept={() => router.push({ pathname: '/rider-job/[id]', params: { id: job.id } })}
+            />
+          ))
+        )}
       </ScrollView>
     </Screen>
   );
