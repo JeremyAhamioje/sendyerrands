@@ -91,10 +91,56 @@ export const features = {
   whatsapp: Boolean(env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN),
   sms: Boolean(env.TERMII_API_KEY),
   paystack: Boolean(env.PAYSTACK_SECRET_KEY),
+  /**
+   * Real money. Paystack prefixes live secrets `sk_live_` and test ones
+   * `sk_test_`, which is the only reliable way to tell from configuration alone
+   * which side of the line a deploy is on.
+   */
+  paystackLive: env.PAYSTACK_SECRET_KEY?.startsWith('sk_live_') ?? false,
   cloudinary: Boolean(
     env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET
   ),
 };
+
+/**
+ * Live keys and a fixed OTP cannot run together. Ever.
+ *
+ * OTP_DEV_MODE makes every account in the system accept one hardcoded code, so
+ * anyone who knows a phone number can sign in as its owner. That is a
+ * reasonable trade for a demo against test keys, where the worst case is
+ * imaginary money. Against live keys the same door empties real wallet
+ * balances and spends real cards, and the two settings live in different places
+ * — one in Paystack's dashboard, one in Render's — so nothing would otherwise
+ * catch the window between switching one and remembering the other.
+ *
+ * Refusing to boot is the point. A warning here would scroll past in a deploy
+ * log and the service would come up serving money to anybody.
+ */
+if (features.paystackLive && env.OTP_DEV_MODE) {
+  console.error(
+    '\n✗ Refusing to start: PAYSTACK_SECRET_KEY is a LIVE key while OTP_DEV_MODE is on.\n' +
+      `  Every account would accept the fixed code ${env.OTP_DEV_CODE}, against real money.\n\n` +
+      '  Set OTP_DEV_MODE=false — and configure an OTP channel first (WHATSAPP_* or\n' +
+      '  TERMII_API_KEY), or nobody will be able to sign in at all.\n'
+  );
+  process.exit(1);
+}
+
+/**
+ * Live keys with no way to send a code is a locked door rather than an open
+ * one, so it warns instead of exiting — but it is still a broken deploy, and
+ * the person who set it up is the only one who can tell which they meant.
+ */
+if (features.paystackLive && !features.whatsapp && !features.sms) {
+  console.warn(
+    '⚠  LIVE Paystack keys with no OTP channel configured. Nobody can sign in.\n' +
+      '   Set WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_ACCESS_TOKEN, or TERMII_API_KEY.'
+  );
+}
+
+if (features.paystackLive && !isProd) {
+  console.warn(`⚠  LIVE Paystack keys with NODE_ENV=${env.NODE_ENV}. Real money, non-production config.`);
+}
 
 // Loud warning rather than a hard failure: the API is meant to run end-to-end
 // on stubs so the app can be demoed before the merchant accounts exist.
