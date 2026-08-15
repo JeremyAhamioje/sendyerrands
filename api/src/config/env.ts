@@ -13,39 +13,34 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('30d'),
 
   /**
-   * Accept a fixed OTP instead of sending one.
+   * Use a fixed password-reset code instead of emailing one, and return it in
+   * the API response.
    *
-   * Left as an optional string rather than defaulting to 'true', because this
-   * flag decides whether anyone can log in as anyone. Defaulting it ON meant a
-   * production deploy that simply did not mention the variable came up with the
-   * door open. It is now resolved against NODE_ENV below: on in development,
-   * off in production unless explicitly and deliberately set to 'true'.
+   * Since sign-in moved to email and password this no longer opens every
+   * account by itself — but it does let anyone who knows an address take it
+   * over, which is the same thing one step removed. Left as an optional string
+   * rather than defaulting to 'true' so that a production deploy which simply
+   * does not mention the variable comes up closed; it resolves against NODE_ENV
+   * below.
    */
   OTP_DEV_MODE: z.string().optional(),
   OTP_DEV_CODE: z.string().default('123456'),
 
-  /** Codes per 15 minutes. Unset means 5 in production, 100 in development. */
+  /** Reset codes per 15 minutes. Unset means 5 in production, 100 in development. */
   OTP_RATE_LIMIT_MAX: z.coerce.number().int().min(1).optional(),
 
-  // Which channel carries the OTP. See services/otp-delivery.ts.
-  OTP_CHANNEL: z.enum(['auto', 'whatsapp', 'sms']).default('auto'),
+  // Transactional email — password resets. See services/email.ts.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_BASE_URL: z.string().default('https://api.resend.com'),
+  EMAIL_FROM: z.string().default('Sendy Errands <no-reply@sendyerrands.com>'),
 
-  // WhatsApp Cloud API (Meta) — the default OTP channel.
-  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
-  WHATSAPP_OTP_TEMPLATE: z.string().default('sendy_otp'),
-  WHATSAPP_TEMPLATE_LANG: z.string().default('en'),
-  WHATSAPP_TEMPLATE_HAS_BUTTON: z
-    .string()
-    .default('true')
-    .transform((v) => v === 'true'),
-  WHATSAPP_API_VERSION: z.string().default('v21.0'),
-  WHATSAPP_BASE_URL: z.string().default('https://graph.facebook.com'),
-
-  // Termii SMS — fallback channel.
-  TERMII_API_KEY: z.string().optional(),
-  TERMII_SENDER_ID: z.string().default('Sendy'),
-  TERMII_BASE_URL: z.string().default('https://api.ng.termii.com'),
+  /*
+   * WHATSAPP_* and TERMII_* used to live here, carrying the login OTP. Sign-in
+   * is email and password now and the only code left goes to an inbox, so both
+   * integrations and their services were removed rather than left configured,
+   * unused, and looking like a working delivery channel. They are in the git
+   * history if a phone channel is ever wanted for order notifications.
+   */
 
   PAYSTACK_SECRET_KEY: z.string().optional(),
   PAYSTACK_PUBLIC_KEY: z.string().optional(),
@@ -79,8 +74,8 @@ export const env = {
   isProd,
   /**
    * Fails closed. Unset means ON in development and OFF in production, so a
-   * deploy can only accept the fixed OTP if someone typed OTP_DEV_MODE=true
-   * against a production environment on purpose.
+   * deploy can only accept the fixed reset code if someone typed
+   * OTP_DEV_MODE=true against a production environment on purpose.
    */
   OTP_DEV_MODE:
     parsed.data.OTP_DEV_MODE !== undefined ? parsed.data.OTP_DEV_MODE === 'true' : !isProd,
@@ -88,8 +83,7 @@ export const env = {
 
 /** True when the integration has real credentials configured. */
 export const features = {
-  whatsapp: Boolean(env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN),
-  sms: Boolean(env.TERMII_API_KEY),
+  email: Boolean(env.RESEND_API_KEY),
   paystack: Boolean(env.PAYSTACK_SECRET_KEY),
   /**
    * Real money. Paystack prefixes live secrets `sk_live_` and test ones
@@ -103,15 +97,16 @@ export const features = {
 };
 
 /**
- * Live keys and a fixed OTP cannot run together. Ever.
+ * Live keys and a fixed reset code cannot run together. Ever.
  *
- * OTP_DEV_MODE makes every account in the system accept one hardcoded code, so
- * anyone who knows a phone number can sign in as its owner. That is a
- * reasonable trade for a demo against test keys, where the worst case is
- * imaginary money. Against live keys the same door empties real wallet
- * balances and spends real cards, and the two settings live in different places
- * — one in Paystack's dashboard, one in Render's — so nothing would otherwise
- * catch the window between switching one and remembering the other.
+ * OTP_DEV_MODE makes every password reset in the system accept one hardcoded
+ * code and hands it back in the API response, so anyone who knows an email
+ * address can take that account over. That is a reasonable trade for a demo
+ * against test keys, where the worst case is imaginary money. Against live keys
+ * the same door empties real wallet balances and spends real cards, and the two
+ * settings live in different places — one in Paystack's dashboard, one in
+ * Render's — so nothing would otherwise catch the window between switching one
+ * and remembering the other.
  *
  * Refusing to boot is the point. A warning here would scroll past in a deploy
  * log and the service would come up serving money to anybody.
@@ -119,22 +114,23 @@ export const features = {
 if (features.paystackLive && env.OTP_DEV_MODE) {
   console.error(
     '\n✗ Refusing to start: PAYSTACK_SECRET_KEY is a LIVE key while OTP_DEV_MODE is on.\n' +
-      `  Every account would accept the fixed code ${env.OTP_DEV_CODE}, against real money.\n\n` +
-      '  Set OTP_DEV_MODE=false — and configure an OTP channel first (WHATSAPP_* or\n' +
-      '  TERMII_API_KEY), or nobody will be able to sign in at all.\n'
+      `  Every password reset would accept the fixed code ${env.OTP_DEV_CODE}, against real money.\n\n` +
+      '  Set OTP_DEV_MODE=false — and set RESEND_API_KEY first, or nobody who\n' +
+      '  forgets a password will be able to recover it.\n'
   );
   process.exit(1);
 }
 
 /**
- * Live keys with no way to send a code is a locked door rather than an open
- * one, so it warns instead of exiting — but it is still a broken deploy, and
- * the person who set it up is the only one who can tell which they meant.
+ * Live keys with no way to send a reset code locks people out of their own
+ * accounts rather than letting strangers in, so it warns instead of exiting —
+ * but it is still a broken deploy, and only the person who set it up knows
+ * which they meant.
  */
-if (features.paystackLive && !features.whatsapp && !features.sms) {
+if (features.paystackLive && !features.email) {
   console.warn(
-    '⚠  LIVE Paystack keys with no OTP channel configured. Nobody can sign in.\n' +
-      '   Set WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_ACCESS_TOKEN, or TERMII_API_KEY.'
+    '⚠  LIVE Paystack keys with no email provider. Password resets cannot be delivered.\n' +
+      '   Set RESEND_API_KEY and EMAIL_FROM.'
   );
 }
 
@@ -145,8 +141,9 @@ if (features.paystackLive && !isProd) {
 // Loud warning rather than a hard failure: the API is meant to run end-to-end
 // on stubs so the app can be demoed before the merchant accounts exist.
 if (env.isProd) {
-  if (!features.whatsapp && !features.sms)
-    console.warn('⚠  No OTP channel configured — set WHATSAPP_* (preferred) or TERMII_API_KEY.');
+  if (!features.email)
+    console.warn('⚠  No email provider configured — set RESEND_API_KEY. Password resets will not send.');
   if (!features.paystack) console.warn('⚠  PAYSTACK_SECRET_KEY missing — card payments are disabled.');
-  if (env.OTP_DEV_MODE) console.warn('⚠  OTP_DEV_MODE is ON in production. Any device can log in as any phone number.');
+  if (env.OTP_DEV_MODE)
+    console.warn('⚠  OTP_DEV_MODE is ON in production. Anyone who knows an email can reset its password.');
 }

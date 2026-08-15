@@ -62,10 +62,12 @@ export function createApp() {
       uptime: process.uptime(),
       env: env.NODE_ENV,
       integrations: {
-        otpChannel: env.OTP_CHANNEL,
-        whatsapp: features.whatsapp ? 'live' : 'stubbed (set WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_ACCESS_TOKEN)',
-        sms: features.sms ? 'live' : 'stubbed (set TERMII_API_KEY)',
-        payments: features.paystack ? 'live' : 'stubbed (set PAYSTACK_SECRET_KEY)',
+        email: features.email ? 'live' : 'not configured (set RESEND_API_KEY)',
+        payments: features.paystack
+          ? features.paystackLive
+            ? 'LIVE — real money'
+            : 'test mode'
+          : 'stubbed (set PAYSTACK_SECRET_KEY)',
         uploads: features.cloudinary ? 'live' : 'stubbed (set CLOUDINARY_* keys)',
         otpDevMode: env.OTP_DEV_MODE,
       },

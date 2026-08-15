@@ -30,7 +30,8 @@ function fieldErrors(error: ZodError) {
 }
 
 /**
- * Tight limit on OTP endpoints — this is the SMS-cost and brute-force surface.
+ * Tight limit on password-reset endpoints — the email-cost and brute-force
+ * surface.
  *
  * Scaled by environment rather than fixed. Five codes per quarter hour is the
  * right ceiling when each one costs money and an attacker is guessing at a real
@@ -42,6 +43,34 @@ function fieldErrors(error: ZodError) {
  * Override with OTP_RATE_LIMIT_MAX when a specific test needs something else.
  */
 const otpMax = env.OTP_RATE_LIMIT_MAX ?? (env.isProd ? 5 : 100);
+
+/**
+ * Sign-in attempts.
+ *
+ * A password is guessable in a way a one-time code sent to an inbox is not, so
+ * this endpoint needs its own ceiling rather than sharing the API's. Twenty per
+ * quarter hour is generous for someone mistyping their own password and useless
+ * to anyone working through a list.
+ *
+ * Keyed on IP, which is the honest limit of what this can do: it slows a single
+ * source, and does nothing about a distributed attempt. The real defences are
+ * the password policy and bcrypt's cost factor, both in lib/password.ts.
+ */
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.isProd ? 20 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Counting only failures means a working session is never interrupted by
+  // someone else on the same NAT, while a run of wrong guesses still trips.
+  skipSuccessfulRequests: true,
+  message: {
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many sign-in attempts. Try again in a few minutes.',
+    },
+  },
+});
 
 export const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

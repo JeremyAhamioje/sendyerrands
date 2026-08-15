@@ -221,19 +221,32 @@ async function main() {
       : `  ✓ admin ${adminEmail} / ${adminPassword}   ← save this, it is not shown again`
   );
 
+  /**
+   * One password across every demo account.
+   *
+   * These are seeded fixtures on a shared database, not credentials — anyone
+   * who can read this file can read the password, which is the point. Never
+   * reuse it for anything that holds real money, and never seed these accounts
+   * against a deployment taking live payments.
+   */
+  const demoPassword = 'sendy-demo-2026';
+  const demoHash = await bcrypt.hash(demoPassword, 12);
+
   // ── demo customer ─────────────────────────────────────────
   const customer = await prisma.user.upsert({
-    where: { phone: '+2348031234567' },
+    where: { email: 'chinedu.okafor@example.com' },
     create: {
+      email: 'chinedu.okafor@example.com',
+      passwordHash: demoHash,
       phone: '+2348031234567',
       firstName: 'Chinedu',
       lastName: 'Okafor',
-      email: 'chinedu.okafor@example.com',
       walletBalanceKobo: 520_000,
       referralCode: 'SENDY-CHI42',
     },
-    update: {},
+    update: { passwordHash: demoHash },
   });
+  console.log(`  ✓ customer ${customer.email} / ${demoPassword}`);
 
   const hasAddress = await prisma.address.count({ where: { userId: customer.id } });
   if (!hasAddress) {
@@ -272,15 +285,21 @@ async function main() {
    */
   const vendorLogin = await prisma.vendor.update({
     where: { slug: 'mama-nkechi' },
-    data: { phone: '+2348012345678' },
-    select: { name: true, phone: true },
+    data: {
+      phone: '+2348012345678',
+      email: 'mama.nkechi@example.com',
+      passwordHash: demoHash,
+    },
+    select: { name: true, email: true },
   });
-  console.log(`  ✓ vendor login ${vendorLogin.phone} (${vendorLogin.name})`);
+  console.log(`  ✓ vendor ${vendorLogin.email} / ${demoPassword} (${vendorLogin.name})`);
 
   // ── demo rider, already approved so jobs can be accepted ──
   const rider = await prisma.rider.upsert({
-    where: { phone: '+2348094482210' },
+    where: { email: 'emeka.adeyemi@example.com' },
     create: {
+      email: 'emeka.adeyemi@example.com',
+      passwordHash: demoHash,
       phone: '+2348094482210',
       firstName: 'Emeka',
       lastName: 'Adeyemi',
@@ -294,9 +313,9 @@ async function main() {
     // vehicleType was added after this rider first existed, so backfill it —
     // an empty update would leave the demo account without the one field the
     // vehicle row on the profile screen reads.
-    update: { vehicleType: 'MOTORBIKE' },
+    update: { vehicleType: 'MOTORBIKE', passwordHash: demoHash },
   });
-  console.log(`  ✓ rider ${rider.phone} (approved — can go online)`);
+  console.log(`  ✓ rider ${rider.email} / ${demoPassword} (approved — can go online)`);
 
   /**
    * A second rider left PENDING on purpose.
@@ -304,12 +323,13 @@ async function main() {
    * The approved one cannot demonstrate anything about verification: the
    * banner, the disabled availability toggle and the 403 from
    * PATCH /rider/availability are only reachable from an unapproved account,
-   * and creating one by hand each time means signing up with a throwaway
-   * number and burning an OTP.
+   * and creating one by hand each time means registering a throwaway account.
    */
   const pendingRider = await prisma.rider.upsert({
-    where: { phone: '+2348055512345' },
+    where: { email: 'tunde.bakare@example.com' },
     create: {
+      email: 'tunde.bakare@example.com',
+      passwordHash: demoHash,
       phone: '+2348055512345',
       firstName: 'Tunde',
       lastName: 'Bakare',
@@ -318,9 +338,9 @@ async function main() {
       zone: 'Yaba',
       status: 'PENDING',
     },
-    update: {},
+    update: { passwordHash: demoHash },
   });
-  console.log(`  ✓ rider ${pendingRider.phone} (pending — for testing the verification gate)`);
+  console.log(`  ✓ rider ${pendingRider.email} / ${demoPassword} (pending — verification gate)`);
 
   // ── an open request with competing bids ───────────────────
   // The bids screen has nothing to render without one, and the bidding window

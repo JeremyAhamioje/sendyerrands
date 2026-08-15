@@ -14,8 +14,8 @@ import { useApp } from '@/store/app';
  * a connection problem and which no amount of tapping Retry will fix. The user
  * is left with a button that cannot work and no way to discover why.
  *
- * So the remedy is chosen from the error: re-authenticate for 401/403, retry
- * for anything else.
+ * So the remedy is chosen from the error: re-authenticate for 401, switch apps
+ * for 403, retry for anything else.
  */
 export function QueryError({
   error,
@@ -39,7 +39,7 @@ export function QueryError({
    * Throwing that token away is destructive and it is also the loudest symptom
    * users reported as "the app randomly logged me out": home renders, a panel
    * appears saying the session expired, they tap the only button on it, and
-   * they are back at the OTP screen with a working session deleted.
+   * they are back at the sign-in screen with a working session deleted.
    *
    * Only 401 — the server saying the token itself is dead — may sign out.
    */
@@ -58,7 +58,7 @@ export function QueryError({
           fullWidth={false}
           onPress={async () => {
             await signOut();
-            router.replace('/phone');
+            router.replace('/signin');
           }}
         />
       </EmptyState>
@@ -93,12 +93,12 @@ export function QueryError({
       >
         <Button title={home.label} fullWidth={false} onPress={() => router.replace(home.to)} />
         <Button
-          title="Sign in with another number"
+          title="Sign in with another account"
           variant="text"
           fullWidth={false}
           onPress={async () => {
             await signOut();
-            router.replace('/phone');
+            router.replace('/signin');
           }}
         />
       </EmptyState>

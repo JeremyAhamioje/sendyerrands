@@ -97,7 +97,7 @@ export default function VendorMe() {
             label="Switch to customer app"
             onPress={async () => {
               await signOut();
-              router.replace('/phone');
+              router.replace('/signin');
             }}
           />
           <ListRow

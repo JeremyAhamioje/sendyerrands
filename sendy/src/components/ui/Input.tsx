@@ -17,6 +17,9 @@ export function Input({
   keyboardType = 'default',
   autoFocus = false,
   multiline = false,
+  secureTextEntry = false,
+  autoCapitalize,
+  autoComplete,
 }: {
   label?: string;
   value: string;
@@ -29,8 +32,25 @@ export function Input({
   keyboardType?: 'default' | 'phone-pad' | 'number-pad' | 'email-address';
   autoFocus?: boolean;
   multiline?: boolean;
+  /** Renders a reveal toggle alongside the mask. */
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  /** Lets the OS password manager offer to fill and to save. */
+  autoComplete?: 'email' | 'current-password' | 'new-password' | 'tel' | 'name' | 'off';
 }) {
   const [focused, setFocused] = useState(false);
+
+  /**
+   * Password fields get a reveal toggle rather than a mask alone.
+   *
+   * The policy in the API asks for ten characters and rejects the obvious ones,
+   * which means people type something long on a phone keyboard where the shift
+   * state is invisible and every character is a dot. Without a way to look,
+   * the failure mode is a confident sign-in attempt against a typo — and on the
+   * signup screen, an account created with a password nobody can reproduce.
+   */
+  const [revealed, setRevealed] = useState(false);
+  const masked = secureTextEntry && !revealed;
   const borderClass = error
     ? 'border-error'
     : focused
@@ -59,9 +79,23 @@ export function Input({
           multiline={multiline}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          secureTextEntry={masked}
+          autoCapitalize={autoCapitalize}
+          autoComplete={autoComplete}
           className="flex-1 text-ink text-[15px]"
           style={{ outlineStyle: 'none' } as never}
         />
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setRevealed((r) => !r)}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            hitSlop={8}
+            className="pl-2"
+          >
+            <Ionicons name={revealed ? 'eye-off-outline' : 'eye-outline'} size={19} color={colors.muted} />
+          </Pressable>
+        ) : null}
       </View>
       {error ? (
         <Text className="text-error text-[13px] mt-1.5">{error}</Text>

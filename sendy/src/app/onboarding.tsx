@@ -60,14 +60,14 @@ export default function Onboarding() {
       ref.current?.scrollTo({ x: (index + 1) * width, animated: true });
       setIndex(index + 1);
     } else {
-      router.replace('/phone');
+      router.replace('/signin');
     }
   };
 
   return (
     <Screen>
       <View className="flex-row justify-end px-4 py-2">
-        <Pressable onPress={() => router.replace('/phone')} accessibilityRole="button" className="px-3 py-2">
+        <Pressable onPress={() => router.replace('/signin')} accessibilityRole="button" className="px-3 py-2">
           <Text className="text-muted text-[15px] font-medium">Skip</Text>
         </Pressable>
       </View>

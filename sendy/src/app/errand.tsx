@@ -33,7 +33,7 @@ export default function CreateErrand() {
 
   const submit = () => {
     if (!activeAddress) return router.push('/addresses');
-    if (!signedIn) return router.push('/phone');
+    if (!signedIn) return router.push('/signin');
 
     const budgetNaira = Number(budget.replace(/[^\d]/g, ''));
 

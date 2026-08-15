@@ -23,10 +23,14 @@ datasource db {
 
 // ─────────────────────────────────────────────── enums
 
+/// Codes are no longer how anyone signs in — email and password are. What is
+/// left is proving control of an inbox in order to set a new password, which is
+/// scoped per account type because the same address may legitimately belong to
+/// a customer and a rider at once.
 enum OtpPurpose {
-  CUSTOMER_LOGIN
-  RIDER_LOGIN
-  VENDOR_LOGIN
+  CUSTOMER_PASSWORD_RESET
+  RIDER_PASSWORD_RESET
+  VENDOR_PASSWORD_RESET
 }
 
 enum RiderStatus {
@@ -135,10 +139,15 @@ enum AdminRole {
 
 model User {
   id                String   @id @default(cuid())
+  /// The login identifier. Stored lowercased so "Ada@x.com" and "ada@x.com"
+  /// cannot become two accounts holding two separate wallet balances.
+  email             String   @unique
+  passwordHash      String
+  /// Still required, but no longer a credential: a rider standing at the door
+  /// needs a number to call, which an email address cannot replace.
   phone             String   @unique // E.164, e.g. +2348031234567
   firstName         String
   lastName          String
-  email             String?  @unique
   walletBalanceKobo Int      @default(0)
   referralCode      String   @unique
   referredByCode    String?
@@ -158,10 +167,13 @@ model User {
 
 model Rider {
   id            String      @id @default(cuid())
+  /// Login identifier, lowercased. Unique within riders only — the same person
+  /// may hold a customer account on the same address.
+  email         String      @unique
+  passwordHash  String
   phone         String      @unique
   firstName     String
   lastName      String
-  email         String?
   /// Structured vehicle data, distinct from the VEHICLE_PAPERS document: this
   /// is what dispatch matches on, that is a scan a human checks once.
   vehicleType   VehicleType?
@@ -225,7 +237,9 @@ model Admin {
 
 model OtpCode {
   id         String     @id @default(cuid())
-  phone      String
+  /// The inbox the code was sent to. Keyed on email rather than phone because
+  /// the code now exists to prove control of the address you sign in with.
+  email      String
   codeHash   String
   purpose    OtpPurpose
   expiresAt  DateTime
@@ -233,7 +247,7 @@ model OtpCode {
   attempts   Int        @default(0)
   createdAt  DateTime   @default(now())
 
-  @@index([phone, purpose])
+  @@index([email, purpose])
   @@map("otp_codes")
 }
 
@@ -274,9 +288,17 @@ model Vendor {
   /// the unit Nigerians actually think in when judging whether something is
   /// close. Defaults to Lagos because every existing vendor is there.
   state           String   @default("Lagos")
-  /// Doubles as the vendor login. Unique so an OTP resolves to one vendor;
-  /// nullable because a vendor ops created by hand may not have one yet, and
-  /// Postgres allows many NULLs under a unique index.
+  /// The vendor login. Nullable, unlike User and Rider, because a vendor is
+  /// never self-registered — it exists because ops approved an application, and
+  /// may be created by hand before anyone has an address on file. Postgres
+  /// allows many NULLs under a unique index, so the constraint still holds for
+  /// every vendor that does have one.
+  email           String?  @unique
+  /// Null until the vendor sets one. Ops creates the account with an address
+  /// only; the vendor claims it through the password-reset flow, so no
+  /// temporary password is ever transmitted or has to be changed later.
+  passwordHash    String?
+  /// Contact number, kept for orders and dispatch. No longer a login.
   phone           String?  @unique
   rating          Float    @default(5)
   ratingCount     Int      @default(0)

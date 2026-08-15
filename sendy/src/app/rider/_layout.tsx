@@ -27,8 +27,8 @@ export default function RiderTabsLayout() {
             title="Sign in as a rider"
             body={
               signedIn
-                ? "You're signed in as a customer. Riders use a separate account — sign in with the number you registered to ride."
-                : 'Sign in with the phone number you registered as a rider.'
+                ? "You're signed in as a customer. Riders use a separate account — sign in with the email you registered to ride."
+                : 'Sign in with the email address you registered as a rider.'
             }
           >
             <Button
@@ -38,7 +38,7 @@ export default function RiderTabsLayout() {
                 if (signedIn) await signOut();
                 // `role=rider` is what makes the API mint a rider token; without
                 // it this button just looped back to the customer app.
-                router.replace({ pathname: '/phone', params: { role: 'rider' } });
+                router.replace({ pathname: '/signin', params: { role: 'rider' } });
               }}
             />
             <View className="h-3" />

@@ -41,8 +41,8 @@ type AppState = {
   actor: 'customer' | 'rider' | 'vendor';
   signIn: (token: string, actor?: 'customer' | 'rider' | 'vendor') => Promise<void>;
   signOut: () => Promise<void>;
-  phoneNumber: string;
-  setPhoneNumber: (v: string) => void;
+  email: string;
+  setEmail: (v: string) => void;
 
   // addresses
   addresses: ApiAddress[];
@@ -73,7 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [actor, setActor] = useState<'customer' | 'rider' | 'vendor'>('customer');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
 
   /**
    * The cart is restored synchronously on web so it is already there for the
@@ -261,8 +261,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       actor,
       signIn,
       signOut,
-      phoneNumber,
-      setPhoneNumber,
+      email,
+      setEmail,
       addresses: list,
       activeAddress: active,
       setActiveAddress: setActiveAddressId,
@@ -280,7 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setVendorFees,
     };
   }, [
-    ready, token, user, actor, signIn, signOut, phoneNumber,
+    ready, token, user, actor, signIn, signOut, email,
     addresses, activeAddressId, cart, vendorId, addToCart, setQty, clearCart, vendorFees,
   ]);
 

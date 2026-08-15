@@ -62,7 +62,7 @@ export default function SendPackage() {
     dropoffPhone.replace(/\D/g, '').length >= 10;
 
   const submit = () => {
-    if (!signedIn) return router.push('/phone');
+    if (!signedIn) return router.push('/signin');
 
     createPackage.mutate(
       {

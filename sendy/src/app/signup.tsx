@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/atoms';
 import { Button } from '@/components/ui/Button';
@@ -12,8 +12,13 @@ import { authApi } from '@/lib/api/endpoints';
 import { useApp } from '@/store/app';
 
 /**
- * Auth step 3 — profile setup, the last gate before Home (design.md §10).
- * Re-verifies the OTP with a name attached, which is what creates the account.
+ * Create an account — one form.
+ *
+ * This replaces phone → OTP → profile-setup, which was three screens and two
+ * round trips to create one account, and which had a genuinely awkward seam in
+ * the middle: the OTP had to stay live across two verify calls so that the
+ * second one could carry a name. None of that is needed when the credential is
+ * something the person chooses.
  */
 type Vehicle = 'MOTORBIKE' | 'BICYCLE' | 'TRICYCLE' | 'CAR' | 'VAN' | 'FOOT';
 
@@ -29,16 +34,20 @@ const VEHICLES: { value: Vehicle; label: string }[] = [
 
 const PLATED: Vehicle[] = ['MOTORBIKE', 'TRICYCLE', 'CAR', 'VAN'];
 
-export default function ProfileSetup() {
+/** Mirrors MIN_LENGTH in the API's lib/password.ts. */
+const MIN_PASSWORD = 10;
+
+export default function SignUp() {
   const router = useRouter();
-  const { code, role } = useLocalSearchParams<{ code?: string; role?: string }>();
+  const { role } = useLocalSearchParams<{ role?: string }>();
   const asRider = role === 'rider';
 
-  const { phoneNumber, signIn } = useApp();
+  const { signIn, email, setEmail } = useApp();
 
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [referral, setReferral] = useState('');
   const [vehicle, setVehicle] = useState<Vehicle>('MOTORBIKE');
   const [plate, setPlate] = useState('');
@@ -48,70 +57,93 @@ export default function ProfileSetup() {
   const valid =
     first.trim().length > 1 &&
     last.trim().length > 1 &&
+    email.trim().length > 3 &&
+    phone.replace(/\D/g, '').length >= 10 &&
+    password.length >= MIN_PASSWORD &&
     (!needsPlate || plate.trim().length >= 4);
 
-  const createAccount = useMutation({
+  const register = useMutation({
     mutationFn: () =>
-      authApi.verifyOtp({
-        phone: phoneNumber,
-        code: code ?? '',
-        role: asRider ? 'rider' : 'customer',
+      authApi.register({
+        email: email.trim(),
+        password,
         firstName: first.trim(),
         lastName: last.trim(),
-        email: email.trim() || undefined,
+        phone: phone.trim(),
+        role: asRider ? 'rider' : 'customer',
         // Referrals are a customer growth loop; riders have no equivalent.
         referredByCode: asRider ? undefined : referral.trim() || undefined,
         vehicleType: asRider ? vehicle : undefined,
         plateNumber: needsPlate ? plate.trim().toUpperCase() : undefined,
       }),
     onSuccess: async (session) => {
-      if (!session.token) {
-        setError('That code expired while you were typing. Please request a new one.');
-        return;
-      }
       await signIn(session.token, asRider ? 'rider' : 'customer');
-      // The dashboard, not the verification wall — see the note in otp.tsx.
+      // The dashboard, not the verification wall: the server refuses job
+      // acceptance for unapproved riders anyway, so there is nothing to protect
+      // by locking them out of their own home screen.
       router.replace(asRider ? '/rider' : '/(tabs)/home');
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : 'Could not finish setting up your account.'),
+      setError(err instanceof ApiError ? err.message : 'Could not create your account.'),
   });
 
   return (
     <Screen>
-      <ScreenHeader title="Almost there" />
+      <ScreenHeader title="Create account" />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }} className="px-4">
         <Text className="text-ink text-[28px] font-display leading-[34px] mt-3">
-          {asRider ? <>Set up your{'\n'}rider profile</> : <>Tell us who to{'\n'}deliver to</>}
+          {asRider ? <>Set up your{'\n'}rider account</> : <>Create your{'\n'}account</>}
         </Text>
         <Text className="text-body text-[15px] mt-2.5 mb-8 leading-[22px]">
           {asRider
             ? 'Customers see this name when you pick up and drop off. Verification comes next.'
-            : 'Your rider uses this name at the door. You can change it later in Profile.'}
+            : 'Your rider uses this name and number at the door.'}
         </Text>
 
-        <Input label="First name" value={first} onChangeText={setFirst} placeholder="Chinedu" autoFocus />
-        <Input label="Last name" value={last} onChangeText={setLast} placeholder="Okafor" />
+        <Input label="First name" value={first} onChangeText={setFirst} placeholder="Chinedu" autoCapitalize="words" autoComplete="name" autoFocus />
+        <Input label="Last name" value={last} onChangeText={setLast} placeholder="Okafor" autoCapitalize="words" />
         <Input
-          label="Email (optional)"
+          label="Email"
           value={email}
           onChangeText={setEmail}
           placeholder="you@example.com"
           keyboardType="email-address"
-          helper={asRider ? 'For payout statements.' : 'For receipts and order updates.'}
+          autoCapitalize="none"
+          autoComplete="email"
+          helper="You'll sign in with this."
         />
+        <Input
+          label="Phone number"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="0803 123 4567"
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          helper={asRider ? 'Customers call this number at the door.' : 'Your rider calls this at the door.'}
+        />
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          placeholder={`At least ${MIN_PASSWORD} characters`}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="new-password"
+          helper={
+            password.length > 0 && password.length < MIN_PASSWORD
+              ? `${MIN_PASSWORD - password.length} more character${MIN_PASSWORD - password.length === 1 ? '' : 's'}`
+              : 'Length matters more than symbols. A few words you’ll remember beats P@ssw0rd.'
+          }
+        />
+
         {asRider ? (
           <>
             <Text className="text-body text-[15px] mb-2.5">What do you ride?</Text>
             <View className="flex-row flex-wrap mb-4">
               {VEHICLES.map((v) => (
                 <View key={v.value} className="mb-2 mr-2">
-                  <Chip
-                    label={v.label}
-                    selected={v.value === vehicle}
-                    onPress={() => setVehicle(v.value)}
-                  />
+                  <Chip label={v.label} selected={v.value === vehicle} onPress={() => setVehicle(v.value)} />
                 </View>
               ))}
             </View>
@@ -124,6 +156,7 @@ export default function ProfileSetup() {
                 onChangeText={setPlate}
                 placeholder="LND-482-GY"
                 icon="car-outline"
+                autoCapitalize="characters"
                 helper="Customers use this to identify you at the door."
               />
             ) : null}
@@ -134,21 +167,33 @@ export default function ProfileSetup() {
             value={referral}
             onChangeText={setReferral}
             placeholder="SENDY-XXXXX"
+            autoCapitalize="characters"
             helper="Get ₦1,000 off your first delivery."
           />
         )}
 
         {error ? <Text className="text-error text-[13px]">{error}</Text> : null}
+
+        <View className="flex-row items-center mt-2">
+          <Text className="text-body text-[15px]">Already have an account?</Text>
+          <Pressable
+            onPress={() => router.replace({ pathname: '/signin', params: role ? { role } : {} })}
+            accessibilityRole="button"
+            className="ml-2"
+          >
+            <Text className="text-pink-600 text-[15px] font-semibold">Sign in</Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <StickyBar>
         <Button
-          title={asRider ? 'Finish & get verified' : 'Finish & start ordering'}
+          title={asRider ? 'Create account & get verified' : 'Create account'}
           disabled={!valid}
-          loading={createAccount.isPending}
+          loading={register.isPending}
           onPress={() => {
             setError(null);
-            createAccount.mutate();
+            register.mutate();
           }}
         />
       </StickyBar>

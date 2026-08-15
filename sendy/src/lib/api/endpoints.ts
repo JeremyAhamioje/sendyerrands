@@ -7,14 +7,21 @@ import type { ApiBid, ApiOrder, ApiProduct, ApiRiderJob, ApiVendor } from './map
  */
 
 // ── auth ────────────────────────────────────────────────────
-export type OtpRequestResult = { phone: string; expiresInSeconds: number; devCode?: string };
+export type Actor = 'customer' | 'rider' | 'vendor';
+
+/** The code is emailed. `devCode` comes back only when OTP_DEV_MODE is on. */
+export type ForgotPasswordResult = {
+  email: string;
+  expiresInSeconds: number;
+  devCode?: string;
+};
+
 export type Session = {
   token: string;
-  isNewAccount: boolean;
+  isNewAccount?: boolean;
   user?: ApiUser;
   rider?: ApiRider;
   vendor?: ApiVendorSession;
-  needsProfile?: boolean;
 };
 
 export type ApiUser = {
@@ -48,18 +55,31 @@ export type ApiAddress = {
 };
 
 export const authApi = {
-  requestOtp: (phone: string, role: 'customer' | 'rider' | 'vendor' = 'customer') =>
-    api.post<OtpRequestResult>('/auth/otp/request', { phone, role }),
-
-  verifyOtp: (input: {
-    phone: string; code: string; role?: 'customer' | 'rider' | 'vendor';
-    firstName?: string; lastName?: string; email?: string; referredByCode?: string;
+  /** Customers and riders only — a vendor account is created by ops. */
+  register: (input: {
+    email: string; password: string;
+    firstName: string; lastName: string; phone: string;
+    role?: 'customer' | 'rider';
+    referredByCode?: string;
     vehicleType?: 'MOTORBIKE' | 'BICYCLE' | 'TRICYCLE' | 'CAR' | 'VAN' | 'FOOT';
     plateNumber?: string;
-  }) => api.post<Session>('/auth/otp/verify', input),
+  }) => api.post<Session>('/auth/register', input),
+
+  login: (input: { email: string; password: string; role?: Actor }) =>
+    api.post<Session>('/auth/login', input),
+
+  /**
+   * Always succeeds, whether or not the address is registered — the API refuses
+   * to confirm which, so the screen must not imply an answer either.
+   */
+  forgotPassword: (email: string, role: Actor = 'customer') =>
+    api.post<ForgotPasswordResult>('/auth/password/forgot', { email, role }),
+
+  resetPassword: (input: { email: string; code: string; password: string; role?: Actor }) =>
+    api.post<{ ok: true }>('/auth/password/reset', input),
 
   session: (token: string) =>
-    api.get<{ actor: 'customer' | 'rider' | 'vendor'; user?: ApiUser; rider?: ApiRider; vendor?: ApiVendorSession }>(
+    api.get<{ actor: Actor; user?: ApiUser; rider?: ApiRider; vendor?: ApiVendorSession }>(
       '/auth/session',
       token
     ),

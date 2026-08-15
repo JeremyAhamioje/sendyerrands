@@ -29,8 +29,8 @@ export default function VendorTabsLayout() {
             title="Sign in as a vendor"
             body={
               signedIn
-                ? 'You’re signed in as a customer. Vendors use the number Sendy Errands approved for your business.'
-                : 'Sign in with the number Sendy Errands approved for your business.'
+                ? 'You’re signed in as a customer. Vendors use the email address Sendy Errands approved for your business.'
+                : 'Sign in with the email address Sendy Errands approved for your business.'
             }
           >
             <Button
@@ -38,7 +38,7 @@ export default function VendorTabsLayout() {
               fullWidth={false}
               onPress={async () => {
                 if (signedIn) await signOut();
-                router.replace({ pathname: '/phone', params: { role: 'vendor' } });
+                router.replace({ pathname: '/signin', params: { role: 'vendor' } });
               }}
             />
             <View className="h-3" />
