@@ -326,14 +326,24 @@ ordersRouter.get(
     const customerId = req.auth!.id;
     const filter = String(req.query.status ?? 'all');
 
-    const ACTIVE = ['PENDING_PAYMENT', 'PLACED', 'VENDOR_ACCEPTED', 'RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] as const;
+    /**
+     * Only the finished states are listed; active is everything else.
+     *
+     * This was an explicit ACTIVE list with history as its complement, which
+     * made adding a status to the enum a silent disappearance: the four errand
+     * states were in neither list, so a live errand answered "no active orders"
+     * on the Orders tab while its own tracking screen showed it progressing.
+     *
+     * Inverting it means a new status is visible by default. Wrong tab is a
+     * far cheaper mistake than an order the customer cannot find at all.
+     */
     const DONE = ['DELIVERED', 'CANCELLED', 'REFUNDED'] as const;
 
     const orders = await prisma.order.findMany({
       where: {
         customerId,
         ...(filter === 'active'
-          ? { status: { in: [...ACTIVE] } }
+          ? { status: { notIn: [...DONE] } }
           : filter === 'history'
             ? { status: { in: [...DONE] } }
             : {}),

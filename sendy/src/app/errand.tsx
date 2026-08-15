@@ -10,7 +10,6 @@ import { Input, SelectField } from '@/components/ui/Input';
 import { Screen, ScreenHeader, StickyBar } from '@/components/ui/Screen';
 import { useCreateErrand, useUploadImage } from '@/lib/api/hooks';
 import { pickImages } from '@/lib/api/uploads';
-import { naira } from '@/lib/format';
 import { colors } from '@/lib/theme';
 import { useApp } from '@/store/app';
 
@@ -243,10 +242,16 @@ export default function CreateErrand() {
           title={
             createErrand.isPending ? 'Posting…' : uploading ? 'Uploading photos…' : 'Find me a rider'
           }
-          // The delivery fee, which is the only thing Sendy charges. It used to
-          // sit next to a form that also collected a budget it would hold, so
-          // "from ₦1,500" read as a deposit rather than the whole price.
-          trailing={`delivery from ${naira(1300)}`}
+          /*
+            No price here at all.
+            
+            Posting an errand charges nothing — the dispatch fee is collected
+            later, when the customer accepts the rider's price, and the quote
+            panel shows the real figure then. Any number here is guesswork the
+            screen cannot back up: "from ₦1,300" was the delivery fee alone and
+            the actual total came to ₦1,600 once the service fee landed, so the
+            first thing the customer saw was already wrong by ₦300.
+          */
           disabled={!canSubmit || createErrand.isPending}
           onPress={submit}
         />
