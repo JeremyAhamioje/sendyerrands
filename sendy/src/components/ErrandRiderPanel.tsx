@@ -58,8 +58,39 @@ export function ErrandRiderPanel({
 
   const submitQuote = () => {
     setError(null);
+
+    /**
+     * Guarded rather than asserted.
+     *
+     * This read `bank!.code`, on the reasoning that the button is disabled
+     * until a bank is chosen — and the non-null assertion turned a wrong
+     * assumption into a crash that took the whole screen down, mid-job, with a
+     * red error overlay and no way back. A rider standing in a market does not
+     * recover from that.
+     *
+     * The assertion was also the only thing hiding the real problem: when the
+     * bank list fails to load there is nothing to select, so no valid choice
+     * exists and the screen should say so rather than pretend one was made.
+     */
+    if (!bank) {
+      setError(
+        banks.length === 0
+          ? 'Bank list is still loading. Give it a moment and try again.'
+          : 'Choose the seller’s bank first.'
+      );
+      return;
+    }
+    if (!/^\d{10}$/.test(accountNumber)) {
+      setError('The account number should be 10 digits.');
+      return;
+    }
+    if (priceNaira <= 0) {
+      setError('Enter what the item costs.');
+      return;
+    }
+
     quote.mutate(
-      { actualItemKobo: priceNaira * 100, bankCode: bank!.code, accountNumber },
+      { actualItemKobo: priceNaira * 100, bankCode: bank.code, accountNumber },
       {
         onError: (err) =>
           setError(err instanceof ApiError ? err.message : 'Could not send that price.'),
@@ -118,18 +149,28 @@ export function ErrandRiderPanel({
             style={{ outlineStyle: 'none' } as never}
           />
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 8 }}
-          className="mb-4"
-        >
-          {shown.slice(0, 40).map((b) => (
-            <View key={b.code} className="mr-2">
-              <Chip label={b.name} selected={b.code === bank?.code} onPress={() => setBank(b)} />
-            </View>
-          ))}
-        </ScrollView>
+        {/* An empty row is a dead end: nothing to tap, a button that stays
+            disabled, and no clue why. Both empty cases say which they are. */}
+        {banks.length === 0 ? (
+          <Text className="text-muted text-[13px] mb-4">Loading banks…</Text>
+        ) : shown.length === 0 ? (
+          <Text className="text-muted text-[13px] mb-4">
+            No bank matches “{query.trim()}”.
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 8 }}
+            className="mb-4"
+          >
+            {shown.slice(0, 40).map((b) => (
+              <View key={b.code} className="mr-2">
+                <Chip label={b.name} selected={b.code === bank?.code} onPress={() => setBank(b)} />
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         <Input
           label="Seller's account number"
