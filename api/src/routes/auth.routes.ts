@@ -399,6 +399,55 @@ authRouter.post(
   })
 );
 
+/**
+ * POST /auth/password/change — change your own password.
+ *
+ * Requires the current one, so a borrowed unlocked phone cannot be used to lock
+ * the owner out of their own account.
+ *
+ * This matters more than usual while self-service reset is unavailable: support
+ * generates a password over the phone, which means an operator briefly knows a
+ * credential to an account they do not own. Without somewhere to change it, that
+ * stays true forever.
+ */
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password.'),
+  newPassword: z.string().min(1, 'Choose a new password.'),
+});
+
+authRouter.post(
+  '/password/change',
+  requireAuth('customer', 'rider', 'vendor'),
+  loginLimiter,
+  validate(changePasswordSchema),
+  asyncHandler(async (req, res) => {
+    const { id, actor } = req.auth!;
+    const { currentPassword, newPassword } = req.body as z.infer<typeof changePasswordSchema>;
+
+    assertPasswordAcceptable(newPassword);
+
+    const account =
+      actor === 'vendor'
+        ? await prisma.vendor.findUnique({ where: { id }, select: { passwordHash: true } })
+        : actor === 'rider'
+          ? await prisma.rider.findUnique({ where: { id }, select: { passwordHash: true } })
+          : await prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
+
+    if (!account?.passwordHash) throw unauthorized();
+    if (!(await verifyPassword(currentPassword, account.passwordHash))) {
+      throw badRequest('That is not your current password.');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    if (actor === 'vendor') await prisma.vendor.update({ where: { id }, data: { passwordHash } });
+    else if (actor === 'rider') await prisma.rider.update({ where: { id }, data: { passwordHash } });
+    else await prisma.user.update({ where: { id }, data: { passwordHash } });
+
+    res.json({ data: { ok: true } });
+  })
+);
+
 /** GET /auth/session — cheap token check on app launch. */
 authRouter.get(
   '/session',

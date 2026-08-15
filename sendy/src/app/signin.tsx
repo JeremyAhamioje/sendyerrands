@@ -83,12 +83,23 @@ export default function SignIn() {
 
         {error ? <Text className="text-error text-[13px] mb-2">{error}</Text> : null}
 
+        {/*
+          Points at support rather than the reset flow, which is built and
+          working but has no email provider configured to deliver the code. A
+          "Forgot password?" link that silently sends nothing is the worst of
+          both: the endpoint answers 200 by design, so the screen would show
+          success and the customer would wait for an email that never comes.
+
+          Restore the /forgot-password route the day RESEND_API_KEY is set.
+        */}
         <Pressable
-          onPress={() => router.push({ pathname: '/forgot-password', params: { role: actor } })}
+          onPress={() => router.push('/help')}
           accessibilityRole="button"
           className="self-start py-2"
         >
-          <Text className="text-pink-600 text-[15px] font-semibold">Forgot password?</Text>
+          <Text className="text-pink-600 text-[15px] font-semibold">
+            Forgot password? Contact support
+          </Text>
         </Pressable>
 
         {/* Vendors cannot self-register — the account exists because ops
@@ -97,7 +108,7 @@ export default function SignIn() {
         {actor === 'vendor' ? (
           <Text className="text-muted text-[13px] mt-4 leading-[20px]">
             Vendor accounts are created when an application is approved. If you have applied and
-            not set a password yet, use Forgot password to claim your account.
+            not set a password yet, contact support and we will set one up with you.
           </Text>
         ) : (
           <View className="flex-row items-center mt-4">

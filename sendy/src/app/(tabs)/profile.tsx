@@ -131,6 +131,11 @@ export default function Profile() {
             label="Vendor dashboard"
             onPress={() => router.push('/vendor-app')}
           />
+          <ListRow
+            icon="lock-closed-outline"
+            label="Change password"
+            onPress={() => router.push('/change-password')}
+          />
           <ListRow icon="headset-outline" label="Help & support" onPress={() => router.push('/help')} />
           <ListRow icon="log-out-outline" label="Log out" danger last onPress={async () => { await signOut(); router.replace('/'); }} />
         </Card>

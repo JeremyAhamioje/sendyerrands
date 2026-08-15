@@ -1,9 +1,12 @@
+import { randomBytes } from 'node:crypto';
+
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 
 import { badRequest, conflict, forbidden, notFound, unauthorized } from '@/lib/errors';
 import { signToken } from '@/lib/jwt';
+import { hashPassword } from '@/lib/password';
 import { prisma } from '@/lib/prisma';
 import { asyncHandler, validate } from '@/middleware';
 import { requireAuth } from '@/middleware/auth';
@@ -707,5 +710,95 @@ adminRouter.delete(
     res.json({
       data: { id: vendor.id, name: vendor.name, productsDeleted: vendor._count.products },
     });
+  })
+);
+
+/**
+ * POST /admin/password-reset — set a new password for a locked-out account.
+ *
+ * Stands in for the self-service reset flow, which needs an email provider the
+ * deployment does not have yet. Support takes the address over the phone, types
+ * it here, and reads the generated password back to the customer.
+ *
+ * The password is generated rather than chosen by whoever is on the call: an
+ * operator picking one produces "sendy123" every time, and it means a human
+ * decided the credential for an account they do not own. It is shown once, in
+ * the response, and never stored in readable form — asking again generates a
+ * different one.
+ *
+ * This is deliberately not a way to sign in AS a customer. It changes the
+ * password, which the account holder will notice, rather than minting a token
+ * that would let an operator act as them silently.
+ */
+const adminResetSchema = z.object({
+  email: z
+    .string()
+    .email('Enter the account email.')
+    .transform((v) => v.trim().toLowerCase()),
+  role: z.enum(['customer', 'rider', 'vendor']),
+});
+
+/**
+ * Ambiguity-free alphabet — no O/0, l/1/I. The whole point is that this gets
+ * read aloud down a phone line and typed by someone who cannot see it.
+ */
+const SPEAKABLE = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+function generatePassword(length = 14): string {
+  const bytes = randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i += 1) out += SPEAKABLE[bytes[i]! % SPEAKABLE.length];
+  return out;
+}
+
+adminRouter.post(
+  '/password-reset',
+  validate(adminResetSchema),
+  asyncHandler(async (req, res) => {
+    const { email, role } = req.body as z.infer<typeof adminResetSchema>;
+
+    const account =
+      role === 'vendor'
+        ? await prisma.vendor.findUnique({ where: { email }, select: { id: true, name: true } })
+        : role === 'rider'
+          ? await prisma.rider.findUnique({
+              where: { email },
+              select: { id: true, firstName: true, lastName: true },
+            })
+          : await prisma.user.findUnique({
+              where: { email },
+              select: { id: true, firstName: true, lastName: true },
+            });
+
+    // Named plainly. This endpoint is behind an admin token, so there is no
+    // account-enumeration concern to protect against — and an operator on a
+    // call needs to know the address is simply wrong.
+    if (!account) throw notFound(`No ${role} account uses ${email}`);
+
+    const password = generatePassword();
+    const passwordHash = await hashPassword(password);
+
+    if (role === 'vendor') {
+      await prisma.vendor.update({ where: { email }, data: { passwordHash } });
+    } else if (role === 'rider') {
+      await prisma.rider.update({ where: { email }, data: { passwordHash } });
+    } else {
+      await prisma.user.update({ where: { email }, data: { passwordHash } });
+    }
+
+    // Any live reset codes for this address are now stale.
+    await prisma.otpCode.updateMany({
+      where: { email, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+
+    const name =
+      'name' in account
+        ? account.name
+        : `${account.firstName ?? ''} ${account.lastName ?? ''}`.trim();
+
+    console.warn(`[admin] password reset for ${role} ${email} by admin ${req.auth!.id}`);
+
+    res.json({ data: { email, role, name, password } });
   })
 );

@@ -14,6 +14,7 @@ const NAV = [
   { to: '/vendors', label: 'Vendors' },
   { to: '/applications', label: 'Applications' },
   { to: '/payouts', label: 'Payouts' },
+  { to: '/password-reset', label: 'Password reset' },
 ] as const;
 
 export function Layout() {

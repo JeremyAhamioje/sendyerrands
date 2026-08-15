@@ -78,6 +78,10 @@ export const authApi = {
   resetPassword: (input: { email: string; code: string; password: string; role?: Actor }) =>
     api.post<{ ok: true }>('/auth/password/reset', input),
 
+  /** Requires the current password, so a borrowed unlocked phone can't lock the owner out. */
+  changePassword: (input: { currentPassword: string; newPassword: string }, token: string) =>
+    api.post<{ ok: true }>('/auth/password/change', input, token),
+
   session: (token: string) =>
     api.get<{ actor: Actor; user?: ApiUser; rider?: ApiRider; vendor?: ApiVendorSession }>(
       '/auth/session',
