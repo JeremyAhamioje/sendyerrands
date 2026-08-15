@@ -60,6 +60,9 @@ export default function TrackOrder() {
   const awaitingQuote = status === 'QUOTE_REQUESTED';
   const quoted = status === 'PRICE_PROPOSED';
   const feePaid = (data?.raw.payments ?? []).some((p) => p.status === 'SUCCESS');
+
+  /** The rider has the goods and is coming — the code becomes useful here. */
+  const handingOver = ['PICKED_UP', 'IN_TRANSIT', 'AT_DOORSTEP'].includes(status);
   const enRoute = status === 'PICKED_UP' || status === 'IN_TRANSIT';
   // Everything between payment and delivery — the window where a map and a
   // rider card mean something.
@@ -236,6 +239,31 @@ export default function TrackOrder() {
                 feePaid={feePaid}
               />
             </View>
+          ) : null}
+
+          {/*
+            The handover code, shown to the person who has to say it out loud.
+
+            The rider's screen has asked for a 4-digit code from the customer
+            since the first build. The customer was never shown one — it was
+            fetched by useOrder and rendered nowhere, so the last step of every
+            delivery ended with a rider asking for digits nobody had. Withheld
+            until the rider actually has the goods, because before that it is
+            just a number with no use.
+          */}
+          {handingOver && data?.deliveryCode ? (
+            <Card className="p-4 mt-4">
+              <Text className="text-muted text-[11px] font-semibold tracking-wide">
+                YOUR DELIVERY CODE
+              </Text>
+              <Text className="text-ink text-[34px] font-bold tracking-[10px] mt-2" selectable>
+                {data.deliveryCode}
+              </Text>
+              <Text className="text-body text-[13px] mt-1.5 leading-[19px]">
+                Give this to {rider ? rider.firstName : 'your rider'} when they hand it over — it
+                is how we know it reached you.
+              </Text>
+            </Card>
           ) : null}
 
           {/* An order created from a bid, an errand or a parcel is priced by the

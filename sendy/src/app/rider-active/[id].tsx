@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Card, EmptyState } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
 import { MapCanvas, TRACK_ROUTE } from '@/components/ui/MapCanvas';
 import { Screen, StickyBar } from '@/components/ui/Screen';
 import { HorizontalStepper } from '@/components/ui/Stepper';
+import { Image } from 'expo-image';
+
 import { ErrandRiderPanel } from '@/components/ErrandRiderPanel';
 import { ApiError } from '@/lib/api/client';
-import { useRiderActive, useUpdateJobStatus } from '@/lib/api/hooks';
+import { pickImages } from '@/lib/api/uploads';
+import { useRiderActive, useUpdateJobStatus, useUploadImage } from '@/lib/api/hooks';
 import { colors, shadow } from '@/lib/theme';
 
 const STEPS = ['Picked up', 'On the way', 'Delivered'];
@@ -25,6 +28,28 @@ export default function RiderActiveDelivery() {
   const orderId = active?.raw.id ?? id;
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Proof of delivery. The card was a dashed border and a camera icon with no
+   * handler behind it, on the one screen where a photo is the evidence that a
+   * handover happened — and useUpdateJobStatus has accepted proofUrl since it
+   * was written. Nothing ever sent one.
+   */
+  const [proof, setProof] = useState<{ localUri: string; url: string | null; failed: boolean } | null>(null);
+  const uploadProof = useUploadImage('proof-of-delivery');
+
+  async function addProof() {
+    const [asset] = await pickImages(1);
+    if (!asset) return;
+    setProof({ localUri: asset.uri, url: null, failed: false });
+    try {
+      const url = await uploadProof.mutateAsync(asset);
+      setProof({ localUri: asset.uri, url, failed: false });
+    } catch (err) {
+      setProof({ localUri: asset.uri, url: null, failed: true });
+      setError(err instanceof Error ? err.message : 'That photo could not be uploaded.');
+    }
+  }
   const codeRef = useRef<TextInput>(null);
 
   /**
@@ -74,7 +99,14 @@ export default function RiderActiveDelivery() {
     setError(null);
     try {
       if (atTheDoor) {
-        await updateStatus.mutateAsync({ id: orderId, status: 'DELIVERED', deliveryCode: code });
+        await updateStatus.mutateAsync({
+          id: orderId,
+          status: 'DELIVERED',
+          deliveryCode: code,
+          // Only a URL that actually landed. A failed upload has none, and the
+          // delivery should still be confirmable without one.
+          ...(proof?.url ? { proofUrl: proof.url } : {}),
+        });
         router.replace('/rider');
         return;
       }
@@ -166,17 +198,45 @@ export default function RiderActiveDelivery() {
 
           {/* proof of delivery */}
           <Text className="text-muted text-[13px] font-semibold mt-7 mb-2.5">PROOF OF DELIVERY</Text>
-          <Card className="flex-row items-center p-4">
-            <View className="w-14 h-14 rounded-md border-[1.5px] border-dashed border-pink-200 bg-pink-50 items-center justify-center mr-3.5">
-              <Ionicons name="camera-outline" size={22} color={colors.pink[400]} />
-            </View>
-            <View className="flex-1">
-              <Text className="text-ink text-[15px] font-semibold">Snap a photo at the door</Text>
-              <Text className="text-muted text-[13px] mt-1 leading-[18px]">
-                And confirm the 4-digit code from {job.dropoffName.split(' ')[0]}.
-              </Text>
-            </View>
-          </Card>
+          <Pressable onPress={addProof} accessibilityRole="button">
+            <Card className="flex-row items-center p-4">
+              <View className="w-14 h-14 rounded-md overflow-hidden border-[1.5px] border-dashed border-pink-200 bg-pink-50 items-center justify-center mr-3.5">
+                {proof ? (
+                  <>
+                    <Image
+                      source={{ uri: proof.localUri }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                    />
+                    {proof.url === null ? (
+                      <View className="absolute inset-0 items-center justify-center bg-ink/40">
+                        {proof.failed ? (
+                          <Ionicons name="alert-circle" size={18} color={colors.white} />
+                        ) : (
+                          <ActivityIndicator color={colors.white} />
+                        )}
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <Ionicons name="camera-outline" size={22} color={colors.pink[400]} />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text className="text-ink text-[15px] font-semibold">
+                  {proof?.url ? 'Photo attached' : proof?.failed ? 'Tap to retry' : 'Snap a photo at the door'}
+                </Text>
+                <Text className="text-muted text-[13px] mt-1 leading-[18px]">
+                  {/* Optional, and said so. A rider cannot always take a usable
+                      photo, and blocking handover on one would strand them. */}
+                  Optional. Confirm the 4-digit code from {job.dropoffName.split(' ')[0]} to finish.
+                </Text>
+              </View>
+              {proof?.url ? (
+                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              ) : null}
+            </Card>
+          </Pressable>
 
           {/* code entry — only meaningful once the rider is at the door */}
           {atTheDoor ? (
