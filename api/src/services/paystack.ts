@@ -176,8 +176,39 @@ export async function listBanks(): Promise<Bank[]> {
   if (bankCache && Date.now() - bankCache.at < BANK_TTL_MS) return bankCache.banks;
 
   const body = await paystackFetch<BankListResponse>('/bank?currency=NGN&country=nigeria');
-  const banks = body.data
-    .map((b) => ({ name: b.name, code: b.code, slug: b.slug }))
+
+  /**
+   * Paystack's live list has codes that appear more than once — four of them,
+   * for two different reasons.
+   *
+   * Sometimes it is one institution under two names (BANKIT MFB and BANKIT
+   * MICROFINANCE BANK LTD). Sometimes it is genuinely different banks sharing a
+   * code (Stellas MFB and YCT MFB; Goodnews and Prospa). Either way a transfer
+   * is addressed by CODE, so both entries behave identically — the name in a
+   * picker decides nothing, and the resolved account holder is the real check.
+   *
+   * Collapsed to one entry per code, with the distinct names joined so a rider
+   * searching for either still finds it. Shipping them separately made two
+   * chips that do exactly the same thing, and React saw duplicate keys.
+   */
+  const byCode = new Map<string, { name: string; code: string; slug: string; names: Set<string> }>();
+
+  for (const b of body.data) {
+    const existing = byCode.get(b.code);
+    if (existing) {
+      existing.names.add(b.name);
+    } else {
+      byCode.set(b.code, { name: b.name, code: b.code, slug: b.slug, names: new Set([b.name]) });
+    }
+  }
+
+  const banks = [...byCode.values()]
+    .map(({ code, slug, names }) => ({
+      // Shortest first so the chip leads with the name people actually use.
+      name: [...names].sort((a, b) => a.length - b.length).join(' / '),
+      code,
+      slug,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   bankCache = { at: Date.now(), banks };
