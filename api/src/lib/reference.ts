@@ -16,9 +16,28 @@ export function otpCode(): string {
 }
 
 /** Referral code: "SENDY-CHI42". */
+/**
+ * A referral code, unique per user.
+ *
+ * The suffix used to be randomInt(10, 99) — ninety possible codes per name
+ * stem. Two customers called Chinedu collided better than one time in ninety,
+ * and the collision surfaced at signup as a bare unique-constraint violation:
+ * "that record already exists", on a form where nothing the person typed was
+ * the problem and nothing they could change would fix it.
+ *
+ * Four characters from an unambiguous alphabet is about 1.7 million per stem.
+ * No I/O/1/0 because these get read aloud and typed by the person being
+ * referred — the same reason the support password generator avoids them.
+ */
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 export function referralCode(firstName: string): string {
   const stem = firstName.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'SND';
-  return `SENDY-${stem}${randomInt(10, 99)}`;
+  let suffix = '';
+  for (let i = 0; i < 4; i += 1) {
+    suffix += CODE_ALPHABET[randomInt(0, CODE_ALPHABET.length)];
+  }
+  return `SENDY-${stem}${suffix}`;
 }
 
 /** Internal payment reference for wallet-funded orders. */
