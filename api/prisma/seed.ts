@@ -397,7 +397,7 @@ async function main() {
   }
   console.log(`  ✓ open request "${request.title}" with ${bidders.length} bids (closes in 30 min)`);
 
-  console.log('\nDone. Sign in with OTP_DEV_CODE from your .env.\n');
+  console.log('\nDone. Sign in with the emails and password above.\n');
 }
 
 main()
