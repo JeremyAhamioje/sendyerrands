@@ -117,7 +117,27 @@ export type ApiOrder = {
   vendor?: { name: string; slug: string; coverUrl: string | null } | null;
   items?: { id: string; name: string; quantity: number; unitPriceKobo?: number; note?: string | null }[];
   packageDetail?: { dropoffAddress: string; size: string } | null;
-  errandDetail?: { task: string; pickupName: string } | null;
+  errandDetail?: {
+    task: string;
+    pickupName: string;
+    /** What the rider found it actually costs, once they have looked. */
+    actualItemKobo?: number | null;
+    /**
+     * Resolved by Paystack on the server, never typed by the rider. Shown to
+     * the customer before they transfer — the only protection in a flow where
+     * Sendy never touches the money and nothing can be reversed.
+     */
+    merchantAccountName?: string | null;
+    merchantAccountNo?: string | null;
+    merchantBankName?: string | null;
+    merchantPaidAt?: string | null;
+    assetSecuredAt?: string | null;
+    atDoorstepAt?: string | null;
+  } | null;
+  /** Used to tell whether the Sendy dispatch fee has been settled. */
+  payments?: {
+    id: string; provider: string; status: string; amountKobo: number; paidAt: string | null;
+  }[];
   // phone is what the track screen's call and WhatsApp buttons dial — without
   // it they render but cannot do anything.
   rider?: { firstName: string; lastName: string; plateNumber: string | null; rating: number; phone: string | null } | null;
@@ -144,7 +164,30 @@ export type ApiRiderJob = {
     pickupName: string; pickupAddress: string;
     dropoffName: string; dropoffAddress: string; size: string;
   } | null;
-  errandDetail?: { task: string; pickupName: string; pickupAddress: string } | null;
+  errandDetail?: {
+    task: string;
+    pickupName: string;
+    pickupAddress: string;
+    details?: string | null;
+    photoUrls?: string[];
+    budgetKobo?: number | null;
+    /** What the rider found it actually costs, once they have looked. */
+    actualItemKobo?: number | null;
+    /**
+     * Resolved by Paystack on the server, never typed by the rider. Shown to
+     * the customer before they transfer — it is the only protection in a flow
+     * where Sendy never touches the money and nothing can be reversed.
+     */
+    merchantAccountName?: string | null;
+    merchantAccountNo?: string | null;
+    merchantBankName?: string | null;
+    merchantPaidAt?: string | null;
+    assetSecuredAt?: string | null;
+    atDoorstepAt?: string | null;
+  } | null;
+  payments?: {
+    id: string; provider: string; status: string; amountKobo: number; paidAt: string | null;
+  }[];
 };
 
 // ─────────────────────────────────────────────── mappers

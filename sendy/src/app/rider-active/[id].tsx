@@ -8,6 +8,7 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { MapCanvas, TRACK_ROUTE } from '@/components/ui/MapCanvas';
 import { Screen, StickyBar } from '@/components/ui/Screen';
 import { HorizontalStepper } from '@/components/ui/Stepper';
+import { ErrandRiderPanel } from '@/components/ErrandRiderPanel';
 import { ApiError } from '@/lib/api/client';
 import { useRiderActive, useUpdateJobStatus } from '@/lib/api/hooks';
 import { colors, shadow } from '@/lib/theme';
@@ -37,7 +38,27 @@ export default function RiderActiveDelivery() {
    * could claim a job and then never move it.
    */
   const status = active?.raw.status;
-  const step = status === 'IN_TRANSIT' ? 2 : status === 'PICKED_UP' ? 1 : 0;
+  /**
+   * AT_DOORSTEP is the last step for everyone. Without it here an errand at the
+   * door computed step 0, so the slide offered "confirm pick-up" and would have
+   * posted PICKED_UP — backwards, and rejected by the server.
+   */
+  const step =
+    status === 'AT_DOORSTEP' ? 2 : status === 'IN_TRANSIT' ? 2 : status === 'PICKED_UP' ? 1 : 0;
+
+  /**
+   * Errands run their own sequence and their own controls.
+   *
+   * The slide-to-confirm below assumes RIDER_ASSIGNED → PICKED_UP → IN_TRANSIT
+   * → DELIVERED, which an errand does not follow: it has to be priced, and the
+   * customer has to pay a seller, before there is anything to pick up. Sliding
+   * "confirm pick-up" from RIDER_ASSIGNED would be rejected by the state machine
+   * anyway — and would be a rider claiming goods nobody has paid for.
+   */
+  const isErrand = active?.raw.type === 'ERRAND';
+  const errand = active?.raw.errandDetail ?? null;
+  // Handover is the same act on every pillar, so the code entry is shared.
+  const errandHandsOver = isErrand && status === 'AT_DOORSTEP';
   const atTheDoor = step === STEPS.length - 1;
 
   /** What this slide does next, in the server's own vocabulary. */
@@ -132,10 +153,16 @@ export default function RiderActiveDelivery() {
             <IconButton icon="call" tone="pink" accessibilityLabel="Call customer" />
           </View>
 
-          {/* stepper */}
-          <View className="mt-6">
-            <HorizontalStepper steps={STEPS} activeIndex={step} />
-          </View>
+          {isErrand ? (
+            <View className="mt-6">
+              <ErrandRiderPanel orderId={orderId} status={status ?? ''} errand={errand} />
+            </View>
+          ) : (
+            /* stepper */
+            <View className="mt-6">
+              <HorizontalStepper steps={STEPS} activeIndex={step} />
+            </View>
+          )}
 
           {/* proof of delivery */}
           <Text className="text-muted text-[13px] font-semibold mt-7 mb-2.5">PROOF OF DELIVERY</Text>
@@ -189,6 +216,9 @@ export default function RiderActiveDelivery() {
         </ScrollView>
       </View>
 
+      {/* An errand's controls live in the panel above until the rider is at the
+          door; only handover uses the shared slide. */}
+      {!isErrand || errandHandsOver ? (
       <StickyBar>
         <Pressable
           onPress={advance}
@@ -211,6 +241,7 @@ export default function RiderActiveDelivery() {
           </Text>
         </Pressable>
       </StickyBar>
+      ) : null}
     </Screen>
   );
 }

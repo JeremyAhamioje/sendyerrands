@@ -168,6 +168,38 @@ export const ordersApi = {
 
   cancel: (id: string, reason: string | undefined, token: string) =>
     api.post<ApiOrder>(`/orders/${id}/cancel`, { reason }, token),
+
+  /**
+   * Records that the customer transferred the item cost to the seller.
+   *
+   * A claim, not a verified fact — Sendy never sees that money. What it stores
+   * is a timestamp, the resolved account name the customer was shown, and
+   * optionally their transfer receipt.
+   */
+  merchantPaid: (id: string, proofUrl: string | undefined, token: string) =>
+    api.post<ApiOrder>(`/orders/${id}/merchant-paid`, { proofUrl }, token),
+};
+
+/** What the rider reports from the stall, once Paystack has resolved it. */
+export type MerchantQuote = {
+  accountName: string;
+  accountNumber: string;
+  bankName: string | null;
+};
+
+export const riderErrandApi = {
+  /** Price the item and name the seller's account. Resolved server-side. */
+  quote: (
+    jobId: string,
+    body: { actualItemKobo: number; bankCode: string; accountNumber: string },
+    token: string
+  ) => api.post<{ order: ApiOrder; merchant: MerchantQuote }>(`/rider/jobs/${jobId}/quote`, body, token),
+
+  assetSecured: (jobId: string, token: string) =>
+    api.post<ApiOrder>(`/rider/jobs/${jobId}/asset-secured`, {}, token),
+
+  atDoorstep: (jobId: string, token: string) =>
+    api.post<ApiOrder>(`/rider/jobs/${jobId}/doorstep`, {}, token),
 };
 
 export const paymentsApi = {

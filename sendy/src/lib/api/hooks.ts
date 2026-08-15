@@ -10,6 +10,7 @@ import type { Vendor } from '@/lib/mock';
 
 import { useApp } from '@/store/app';
 
+import { riderErrandApi } from './endpoints';
 import { uploadImage, type UploadFolder } from './uploads';
 import {
   clearPendingPayment,
@@ -876,6 +877,68 @@ export function useRespondToOrder() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vendor-orders'] });
       qc.invalidateQueries({ queryKey: ['vendor-me'] });
+    },
+  });
+}
+
+// ── the errand loop ─────────────────────────────────────────
+
+/**
+ * The rider prices the item and names the seller's account.
+ *
+ * The account is resolved against Paystack on the server, and the response
+ * carries the resolved holder name — which is the only thing standing between a
+ * mistyped digit and money landing with a stranger. Sendy never moves this
+ * money, so there is nothing to reverse if it goes wrong.
+ */
+export function useQuoteErrand(jobId: string) {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { actualItemKobo: number; bankCode: string; accountNumber: string }) =>
+      riderErrandApi.quote(jobId, body, token!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
+      qc.invalidateQueries({ queryKey: ['rider-jobs'] });
+    },
+  });
+}
+
+/** Rider: the item is in hand. Refused until the customer confirms payment. */
+export function useAssetSecured(jobId: string) {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => riderErrandApi.assetSecured(jobId, token!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
+      qc.invalidateQueries({ queryKey: ['rider-deliveries'] });
+    },
+  });
+}
+
+/** Rider: arrived at the door. */
+export function useAtDoorstep(jobId: string) {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => riderErrandApi.atDoorstep(jobId, token!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
+      qc.invalidateQueries({ queryKey: ['rider-deliveries'] });
+    },
+  });
+}
+
+/** Customer: confirms they transferred the item cost to the seller. */
+export function useConfirmMerchantPaid(orderId: string) {
+  const { token } = useApp();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (proofUrl?: string) => ordersApi.merchantPaid(orderId, proofUrl, token!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', orderId] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 }

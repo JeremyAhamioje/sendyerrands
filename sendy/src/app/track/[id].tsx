@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { ErrandQuotePanel } from '@/components/ErrandQuotePanel';
 import { Badge, Card, Divider, Skeleton } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
@@ -44,6 +45,17 @@ export default function TrackOrder() {
   // screens use; the raw status is what this screen actually needs.
   const status = data?.raw.status ?? '';
   const unpaid = status === 'PENDING_PAYMENT';
+
+  /**
+   * The errand lane. An errand is posted unpaid and priced by a rider standing
+   * in front of the item, so it passes through states the other pillars never
+   * see — and the customer's money leaves at a different moment, to a different
+   * person.
+   */
+  const errand = data?.raw.errandDetail ?? null;
+  const awaitingQuote = status === 'QUOTE_REQUESTED';
+  const quoted = status === 'PRICE_PROPOSED';
+  const feePaid = (data?.raw.payments ?? []).some((p) => p.status === 'SUCCESS');
   const enRoute = status === 'PICKED_UP' || status === 'IN_TRANSIT';
   // Everything between payment and delivery — the window where a map and a
   // rider card mean something.
@@ -188,6 +200,39 @@ export default function TrackOrder() {
               </View>
             ) : null}
           </View>
+
+          {/* Nobody has looked at the item yet, so there is no price and nothing
+              to pay. Saying so beats an empty space where a total belongs. */}
+          {awaitingQuote ? (
+            <Card className="p-4 mt-4">
+              <View className="flex-row items-center">
+                <Ionicons name="search-outline" size={17} color={colors.pink[600]} />
+                <Text className="text-ink text-[15px] font-semibold ml-2.5">
+                  Finding you a rider
+                </Text>
+              </View>
+              <Text className="text-body text-[13px] mt-2 leading-[19px]">
+                A rider will go and check what it actually costs, then send you the price and the
+                seller&apos;s account. You haven&apos;t been charged anything.
+              </Text>
+            </Card>
+          ) : null}
+
+          {quoted && errand?.actualItemKobo ? (
+            <View className="mt-4">
+              <ErrandQuotePanel
+                orderId={id}
+                itemKobo={errand.actualItemKobo}
+                dispatchKobo={data?.raw.totalKobo ?? 0}
+                merchant={{
+                  accountName: errand.merchantAccountName ?? null,
+                  accountNumber: errand.merchantAccountNo ?? null,
+                  bankName: errand.merchantBankName ?? null,
+                }}
+                feePaid={feePaid}
+              />
+            </View>
+          ) : null}
 
           {/* An order created from a bid, an errand or a parcel is priced by the
               server and lands here unpaid — this is the only place to settle it. */}
