@@ -7,6 +7,7 @@ import { Card, EmptyState } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
 import { MapCanvas, TRACK_ROUTE } from '@/components/ui/MapCanvas';
 import { Screen, StickyBar } from '@/components/ui/Screen';
+import { SlideToConfirm } from '@/components/ui/SlideToConfirm';
 import { HorizontalStepper } from '@/components/ui/Stepper';
 import { Image } from 'expo-image';
 
@@ -280,26 +281,15 @@ export default function RiderActiveDelivery() {
           door; only handover uses the shared slide. */}
       {!isErrand || errandHandsOver ? (
       <StickyBar>
-        <Pressable
-          onPress={advance}
-          accessibilityRole="button"
-          accessibilityLabel={SLIDE_LABEL[step].replace('Slide to ', '')}
-          disabled={updateStatus.isPending || (atTheDoor && code.length < 4)}
-          style={shadow.card}
-          className={`h-[56px] rounded-full flex-row items-center px-2 ${
-            updateStatus.isPending || (atTheDoor && code.length < 4)
-              ? 'bg-pink-600/40'
-              : 'bg-pink-600 active:bg-pink-700'
-          }`}
-        >
-          <View className="w-11 h-11 rounded-full bg-white items-center justify-center">
-            <Ionicons name="arrow-forward" size={20} color={colors.pink[600]} />
-          </View>
-          <Text className="text-white text-[15px] font-semibold flex-1 text-center mr-6">
-            {/* Always names the NEXT transition, never the current state. */}
-            {updateStatus.isPending ? 'Updating…' : SLIDE_LABEL[step]}
-          </Text>
-        </Pressable>
+        {/* Always names the NEXT transition, never the current state — and now
+            actually requires the gesture it names. */}
+        <SlideToConfirm
+          label={SLIDE_LABEL[step]!}
+          pendingLabel="Updating…"
+          pending={updateStatus.isPending}
+          disabled={atTheDoor && code.length < 4}
+          onConfirm={advance}
+        />
       </StickyBar>
       ) : null}
     </Screen>
