@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
@@ -12,6 +13,7 @@ import { ApiError } from '@/lib/api/client';
 import { useSettleReturnedTopup, useTopUpWallet, useWallet } from '@/lib/api/hooks';
 import { naira } from '@/lib/format';
 import { colors } from '@/lib/theme';
+import { useApp } from '@/store/app';
 
 /**
  * Sendy Errands Wallet (design.md §10, under Profile).
@@ -35,6 +37,8 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function Wallet() {
+  const router = useRouter();
+  const { signedIn } = useApp();
   const { data, isLoading, isError, error, refetch, isRefetching } = useWallet();
   const [funding, setFunding] = useState(false);
 
@@ -44,6 +48,28 @@ export default function Wallet() {
 
   const balance = data?.balance ?? 0;
   const transactions = data?.transactions ?? [];
+
+  /**
+   * A wallet belongs to an account. Rendering the balance card at ₦0 with a
+   * working Top up button underneath it invites someone to pay money into
+   * nothing — the request would 401, after the payment sheet.
+   */
+  if (!signedIn) {
+    return (
+      <Screen className="bg-surface">
+        <ScreenHeader title="Wallet" />
+        <View className="flex-1 justify-center">
+          <EmptyState
+            icon="wallet-outline"
+            title="Sign in to use your wallet"
+            body="Your balance, top-ups and statement are tied to your account."
+          >
+            <Button title="Sign in" fullWidth={false} onPress={() => router.push('/signin')} />
+          </EmptyState>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen className="bg-surface">

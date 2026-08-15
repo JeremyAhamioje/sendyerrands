@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Badge, Card, EmptyState, Skeleton } from '@/components/ui/atoms';
 import { Button } from '@/components/ui/Button';
+import { useApp } from '@/store/app';
 import { Screen, Segmented } from '@/components/ui/Screen';
 import { QueryError } from '@/components/ui/QueryError';
 import { Thumb } from '@/components/ui/Thumb';
@@ -17,6 +18,7 @@ import { colors } from '@/lib/theme';
 export default function Orders() {
   const router = useRouter();
   const [tab, setTab] = useState('Active');
+  const { signedIn } = useApp();
   const { data: orders = [], isLoading, isError, error, refetch } = useOrders(
     tab === 'Active' ? 'active' : 'history'
   );
@@ -38,6 +40,18 @@ export default function Orders() {
           <QueryError error={error} onRetry={() => refetch()} noun="your orders" />
         ) : list.length ? (
           list.map((order) => <OrderRow key={order.id} order={order} router={router} />)
+        ) : !signedIn ? (
+          /* "No active orders" is a factual claim about an account, and there
+             isn't one. Someone signed out has orders — they just aren't
+             visible from here, and telling them to start another is advice
+             that walks them into a sign-in wall two screens later. */
+          <EmptyState
+            icon="person-circle-outline"
+            title="Sign in to see your orders"
+            body="Your orders and live tracking are tied to your account."
+          >
+            <Button title="Sign in" fullWidth={false} onPress={() => router.push('/signin')} />
+          </EmptyState>
         ) : (
           <EmptyState
             icon="receipt-outline"

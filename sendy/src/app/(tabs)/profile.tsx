@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Card, ListRow } from '@/components/ui/atoms';
+import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { koboToNaira } from '@/lib/api/mappers';
 import { naira } from '@/lib/format';
@@ -14,10 +15,78 @@ import { useApp } from '@/store/app';
 /** Profile (design.md §10) — wallet, addresses, payment, settings, referrals. */
 export default function Profile() {
   const router = useRouter();
-  const { signOut, addresses, user } = useApp();
+  const { signOut, addresses, user, signedIn } = useApp();
   const fullName = user ? user.firstName + ' ' + user.lastName : 'Your profile';
   const initials = user ? (user.firstName[0] + user.lastName[0]).toUpperCase() : '–';
   const walletBalance = koboToNaira(user?.walletBalanceKobo);
+
+  /**
+   * Signed out is a real state, not an empty version of the signed-in one.
+   *
+   * This screen used to render regardless: "Your profile" over a dash for
+   * initials, a ₦0 wallet that opened a screen requiring a token, a referral
+   * code showing "—" with a Share button beside it, and — at the bottom — Log
+   * out, offered to someone who was not logged in. Every one of those is a
+   * control that cannot work, and together they read as a broken account rather
+   * than an absent one.
+   *
+   * Browsing without an account is deliberately still allowed: vendors, search
+   * and help all work, and the ordering screens ask for sign-in at the point
+   * they actually need it. This is the one place that has to say so plainly and
+   * offer the way in.
+   */
+  if (!signedIn) {
+    return (
+      <Screen>
+        <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+          <View className="px-4 py-3">
+            <Text className="text-ink text-[24px] font-display">Profile</Text>
+          </View>
+
+          <View className="px-4">
+            <Card className="p-5 items-center">
+              <View className="w-16 h-16 rounded-full bg-pink-50 items-center justify-center">
+                <Ionicons name="person-outline" size={28} color={colors.pink[600]} />
+              </View>
+              <Text className="text-ink text-[18px] font-semibold mt-4">You&apos;re not signed in</Text>
+              <Text className="text-body text-[14px] mt-2 mb-5 text-center leading-[20px]">
+                Sign in to place orders, track deliveries and use your wallet.
+              </Text>
+              <Button title="Sign in" onPress={() => router.push('/signin')} />
+              <Pressable
+                onPress={() => router.push('/signup')}
+                accessibilityRole="button"
+                className="mt-3 py-2"
+              >
+                <Text className="text-pink-600 text-[15px] font-semibold">Create an account</Text>
+              </Pressable>
+            </Card>
+          </View>
+
+          {/* Both gates explain themselves to anyone who is not that kind of
+              account, so they are safe to offer while signed out. */}
+          <Text className="text-muted text-[13px] font-semibold px-4 mt-7 mb-2">MORE</Text>
+          <Card className="mx-4 overflow-hidden">
+            <ListRow icon="bicycle-outline" label="Sign in as a rider" onPress={() => router.push('/rider')} />
+            <ListRow
+              icon="business-outline"
+              label="Vendor dashboard"
+              onPress={() => router.push('/vendor-app')}
+            />
+            <ListRow icon="headset-outline" label="Help & support" last onPress={() => router.push('/help')} />
+          </Card>
+
+          <Text
+            onPress={() => router.push('/diagnostics')}
+            accessibilityRole="button"
+            className="text-muted text-[11px] text-center mt-7"
+          >
+            Sendy Errands {Constants.expoConfig?.version ?? ''} · Diagnostics
+          </Text>
+        </ScrollView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
