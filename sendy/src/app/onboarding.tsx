@@ -27,8 +27,8 @@ const SLIDES = [
   },
   {
     art: require('../../assets/images/onboarding-parcels.png'),
-    title: 'Parcels across\nLagos, same day',
-    body: 'Point A to point B. Pick a parcel size, add the receiver, and track it live.',
+    title: 'Parcels across\nany state',
+    body: 'Lagos to Kano, or across town. Pick the route, pick a size, and track it the whole way.',
   },
   {
     art: require('../../assets/images/onboarding-bids.png'),

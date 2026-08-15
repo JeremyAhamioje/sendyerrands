@@ -223,6 +223,13 @@ export type PackageBody = {
   isFragile?: boolean;
   notes?: string;
   addressId?: string;
+  /**
+   * Sent by the Logistics flow. The server recomputes the fee from these rather
+   * than trusting a price or an "interstate" flag from the client, so omitting
+   * them prices as a local delivery.
+   */
+  originState?: string;
+  destinationState?: string;
 };
 
 export function useCreatePackage() {

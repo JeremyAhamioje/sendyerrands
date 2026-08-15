@@ -33,11 +33,13 @@ export default function Profile() {
           </View>
           <View className="flex-1 ml-4">
             <Text className="text-ink text-[20px] font-bold">{fullName}</Text>
-            <Text className="text-muted text-[13px] mt-0.5">{user?.phone ?? ""}</Text>
+            <Text className="text-muted text-[13px] mt-0.5">{user?.phone ?? ''}</Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" className="p-2">
-            <Ionicons name="create-outline" size={21} color={colors.pink[600]} />
-          </Pressable>
+          {/* The edit pencil is gone. The name on an account is what appears on
+              every order, handover and payout record, so it is deliberately not
+              editable in-app — and a control that opens nothing is worse than
+              no control, because it reads as a broken feature rather than an
+              absent one. */}
         </View>
 
         {/* wallet */}

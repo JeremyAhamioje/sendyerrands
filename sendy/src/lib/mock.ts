@@ -687,16 +687,21 @@ export type Category = {
   icon: string;
   badge?: string;
   href?: string;
+  /** Rendered grey and inert, with a 'Coming soon' caption. */
+  comingSoon?: boolean;
 };
 
 export const CATEGORIES: Category[] = [
   { slug: 'errands', label: 'Errands', icon: 'receipt-outline', href: '/errand' },
-  { slug: 'delivery', label: 'Delivery', icon: 'git-network-outline', href: '/package' },
+  { slug: 'logistics', label: 'Logistics', icon: 'trail-sign-outline', href: '/logistics' },
   { slug: 'marketplace', label: 'Marketplace', icon: 'storefront-outline', badge: 'NEW', href: '/marketplace' },
   { slug: 'shops', label: 'Shops', icon: 'bag-handle-outline' },
   { slug: 'pharmacy', label: 'Pharmacy', icon: 'medkit-outline' },
   { slug: 'markets', label: 'Markets', icon: 'cart-outline' },
-  { slug: 'bills', label: 'Bills', icon: 'reader-outline' },
+  // No route on purpose. Bills had a chevron and a category page with nothing
+  // behind it; a tile that opens an empty screen is worse than one that says
+  // it is not ready.
+  { slug: 'bills', label: 'Bills', icon: 'reader-outline', comingSoon: true },
   { slug: 'packages', label: 'Packages', icon: 'cube-outline', href: '/package' },
 ];
 

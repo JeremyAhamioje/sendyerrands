@@ -51,6 +51,13 @@ const packageSchema = z.object({
   notes: z.string().max(500).optional(),
   addressId: z.string().optional(),
   scheduledFor: z.coerce.date().optional(),
+  /**
+   * Where the parcel starts and ends, for interstate pricing. Optional so the
+   * existing same-city flow keeps working untouched — omitted, both ends are
+   * assumed to be in one state and the local fee applies.
+   */
+  originState: z.string().max(40).optional(),
+  destinationState: z.string().max(40).optional(),
 });
 
 /**
@@ -70,6 +77,56 @@ const PARCEL_FEE_KOBO: Record<ParcelSize, number> = {
   LARGE: 280_000,
   EXTRA_LARGE: 420_000,
 };
+
+/**
+ * Added on top of the local fee when a parcel crosses a state line.
+ *
+ * The fee used to be size alone, which was fine while everything moved inside
+ * Lagos. It stops being fine the moment the app offers Lagos → Kano: that is a
+ * different vehicle, a different number of days and a different cost, and
+ * charging ₦1,300 for it would be a promise the business cannot keep.
+ *
+ * Kept as a flat surcharge per size rather than a per-kilometre rate because
+ * nothing here knows distances — there is no maps provider — and a made-up
+ * distance is worse than an honest band. Every interstate route costs the same
+ * today; when real lane data exists this is where it goes.
+ */
+const INTERSTATE_SURCHARGE_KOBO: Record<ParcelSize, number> = {
+  SMALL: 270_000,
+  MEDIUM: 410_000,
+  LARGE: 620_000,
+  EXTRA_LARGE: 930_000,
+};
+
+/**
+ * The states are compared here rather than trusted from a client-sent flag.
+ * A boolean like `isInterstate` on the request would let anyone post an
+ * interstate parcel at the local price.
+ */
+/**
+ * Appends the state unless the address already names it, so a customer who
+ * typed "…, Ikeja, Lagos" does not get "Lagos, Lagos" back on the job card.
+ * Truncated to the column's 240 characters.
+ */
+function withState(address: string, state?: string): string {
+  const trimmed = address.trim();
+  if (!state) return trimmed;
+  if (trimmed.toLowerCase().includes(state.trim().toLowerCase())) return trimmed;
+  return `${trimmed}, ${state.trim()}`.slice(0, 240);
+}
+
+export function parcelFeeKobo(
+  size: ParcelSize,
+  originState?: string,
+  destinationState?: string
+): number {
+  const base = PARCEL_FEE_KOBO[size];
+  if (!originState || !destinationState) return base;
+
+  const crosses =
+    originState.trim().toLowerCase() !== destinationState.trim().toLowerCase();
+  return crosses ? base + INTERSTATE_SURCHARGE_KOBO[size] : base;
+}
 
 /**
  * POST /orders — food or marketplace order from a cart.
@@ -199,7 +256,7 @@ ordersRouter.post(
     const customerId = req.auth!.id;
     const body = req.body as z.infer<typeof packageSchema>;
 
-    const deliveryFeeKobo = PARCEL_FEE_KOBO[body.size];
+    const deliveryFeeKobo = parcelFeeKobo(body.size, body.originState, body.destinationState);
 
     // A parcel has no goods value — the delivery fee is the whole charge, and
     // there is no service fee to add on top of it.
@@ -221,10 +278,14 @@ ordersRouter.post(
         packageDetail: {
           create: {
             pickupName: body.pickupName,
-            pickupAddress: body.pickupAddress,
+            // The state is folded into the stored address rather than kept in
+            // its own column. A rider reading a job needs one complete address,
+            // and "12 Awolowo Road, Ikoyi" is ambiguous across states in a way
+            // that matters once parcels leave Lagos.
+            pickupAddress: withState(body.pickupAddress, body.originState),
             pickupPhone: body.pickupPhone,
             dropoffName: body.dropoffName,
-            dropoffAddress: body.dropoffAddress,
+            dropoffAddress: withState(body.dropoffAddress, body.destinationState),
             dropoffPhone: body.dropoffPhone,
             size: body.size,
             contents: body.contents,

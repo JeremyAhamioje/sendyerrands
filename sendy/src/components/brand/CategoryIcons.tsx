@@ -130,7 +130,7 @@ export const PackagesIcon = ({ size, main, soft, ...rest }: IconProps) => (
  */
 export const CATEGORY_PALETTE: Record<string, { tint: string; main: string; soft: string }> = {
   errands: { tint: '#FFEFD6', main: '#B8620A', soft: '#F7A93B' },
-  delivery: { tint: '#FFE2ED', main: '#B01358', soft: '#F569A6' },
+  logistics: { tint: '#FFE2ED', main: '#B01358', soft: '#F569A6' },
   marketplace: { tint: '#FFE3E1', main: '#C0261F', soft: '#F4766F' },
   shops: { tint: '#FFEAD6', main: '#C2530A', soft: '#FB9A47' },
   pharmacy: { tint: '#DFEBFF', main: '#1B4FA8', soft: '#5D9BEE' },
@@ -141,7 +141,7 @@ export const CATEGORY_PALETTE: Record<string, { tint: string; main: string; soft
 
 const ICONS: Record<string, (p: IconProps) => React.ReactElement> = {
   errands: ErrandsIcon,
-  delivery: DeliveryIcon,
+  logistics: DeliveryIcon,
   marketplace: MarketplaceIcon,
   shops: ShopsIcon,
   pharmacy: PharmacyIcon,
@@ -150,9 +150,27 @@ const ICONS: Record<string, (p: IconProps) => React.ReactElement> = {
   packages: PackagesIcon,
 };
 
+/**
+ * Greys for a category that is not available yet.
+ *
+ * Two tones rather than one flat fill, so the glyph keeps the shape reading it
+ * has in colour — a single grey collapses the van, the meter and the basket
+ * into indistinguishable blobs at 30px.
+ */
+const MUTED = { main: '#6B7280', soft: '#C3C8D0' };
+
 /** Resolves a category slug to its icon + palette. Falls back to Packages. */
-export function CategoryIcon({ slug, size = 28 }: { slug: string; size?: number }) {
-  const palette = CATEGORY_PALETTE[slug] ?? CATEGORY_PALETTE.packages!;
+export function CategoryIcon({
+  slug,
+  size = 28,
+  muted = false,
+}: {
+  slug: string;
+  size?: number;
+  /** Draw it grey — for a tile that is visible but not yet usable. */
+  muted?: boolean;
+}) {
+  const palette = muted ? MUTED : (CATEGORY_PALETTE[slug] ?? CATEGORY_PALETTE.packages!);
   const Icon = ICONS[slug] ?? PackagesIcon;
   return <Icon size={size} main={palette.main} soft={palette.soft} />;
 }
