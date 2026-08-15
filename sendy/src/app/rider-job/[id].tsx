@@ -75,7 +75,7 @@ export default function RiderJobDetail() {
           <View className="flex-row mt-4">
             {job.distanceKm > 0 ? <Meta icon="navigate-outline" label={`${job.distanceKm} km total`} /> : null}
             {job.minutes > 0 ? <Meta icon="time-outline" label={`~${job.minutes} min`} /> : null}
-            <Meta icon="card-outline" label={job.prepaid ? 'Prepaid' : 'Cash'} />
+            <Meta icon="card-outline" label={job.paymentLabel ?? (job.prepaid ? 'Prepaid' : 'Cash')} />
           </View>
 
           {/* route */}

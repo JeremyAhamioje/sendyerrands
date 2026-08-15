@@ -156,6 +156,7 @@ export type ApiBid = {
 export type ApiRiderJob = {
   id: string;
   reference: string;
+  status: string;
   type: 'FOOD' | 'MARKETPLACE' | 'ERRAND' | 'PACKAGE';
   riderPayoutKobo: number;
   vendor?: { name: string; area: string | null } | null;
@@ -332,6 +333,15 @@ export function toBid(b: ApiBid): Bid {
   };
 }
 
+const PAYMENT_LABEL: Record<string, string> = {
+  QUOTE_REQUESTED: 'Needs pricing',
+  PRICE_PROPOSED: 'Awaiting customer',
+  MERCHANT_PAID: 'Seller paid',
+  PENDING_PAYMENT: 'Unpaid',
+  PLACED: 'Prepaid',
+  VENDOR_ACCEPTED: 'Prepaid',
+};
+
 export function toRiderJob(j: ApiRiderJob): RiderJob {
   const pickupName =
     j.packageDetail?.pickupName ?? j.errandDetail?.pickupName ?? j.vendor?.name ?? 'Pickup';
@@ -353,6 +363,19 @@ export function toRiderJob(j: ApiRiderJob): RiderJob {
     distanceKm: 0,
     minutes: 0,
     prepaid: true,
+    /**
+     * What the rider needs to know about money on THIS job.
+     *
+     * "Prepaid" was hardcoded true, which was honest while every order was paid
+     * before it reached the board. An errand is posted unpaid — pricing it is
+     * the job — so an errand awaiting a quote displayed "Prepaid" over an order
+     * nobody had paid a kobo for.
+     *
+     * Prepaid/Cash is also the wrong question for an errand. The rider never
+     * handles the item money either way: the customer transfers it straight to
+     * the seller. What matters is which step it is waiting on.
+     */
+    paymentLabel: PAYMENT_LABEL[j.status] ?? (j.type === 'ERRAND' ? 'Unpaid' : 'Prepaid'),
     notes: j.errandDetail?.task ?? undefined,
   };
 }

@@ -183,12 +183,40 @@ riderRouter.post(
     const orderId = req.params.id!;
 
     const claimed = await prisma.order.updateMany({
-      where: { id: orderId, riderId: null, status: { in: ['PLACED', 'VENDOR_ACCEPTED'] } },
+      // QUOTE_REQUESTED belongs here: an errand is claimable while unpaid,
+      // because pricing it is the job. Leaving it out meant every errand
+      // matched zero rows and reported a rival rider who did not exist.
+      where: {
+        id: orderId,
+        riderId: null,
+        status: { in: ['PLACED', 'VENDOR_ACCEPTED', 'QUOTE_REQUESTED'] },
+      },
       data: { riderId },
     });
 
     if (claimed.count === 0) {
-      throw conflict('Another rider just took that job. Pull down to refresh.');
+      /**
+       * Say which it was.
+       *
+       * A zero-row claim has two causes and they need different responses:
+       * someone else got there first, or the job is not in a claimable state.
+       * Reporting both as "another rider took that job" sent riders pulling to
+       * refresh a list that would never change, and hid the status bug that
+       * made every errand unclaimable.
+       */
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { riderId: true, status: true },
+      });
+
+      if (!order) throw notFound('Job');
+      if (order.riderId && order.riderId !== riderId) {
+        throw conflict('Another rider just took that job. Pull down to refresh.');
+      }
+      if (order.riderId === riderId) {
+        throw conflict('You already have this job. Check your deliveries.');
+      }
+      throw conflict(`This job is no longer available (${order.status.toLowerCase().replace(/_/g, ' ')}).`);
     }
 
     const order = await transitionOrder(orderId, 'RIDER_ASSIGNED', { type: 'rider', id: riderId });
@@ -203,7 +231,18 @@ riderRouter.get(
     const order = await prisma.order.findFirst({
       where: {
         riderId: req.auth!.id,
-        status: { in: ['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] },
+        // The errand states belong here too, or a rider who accepts one is sent
+        // to an active-delivery screen that reports no active delivery.
+        status: {
+          in: [
+            'RIDER_ASSIGNED',
+            'PRICE_PROPOSED',
+            'MERCHANT_PAID',
+            'PICKED_UP',
+            'IN_TRANSIT',
+            'AT_DOORSTEP',
+          ],
+        },
       },
       include: {
         vendor: true,

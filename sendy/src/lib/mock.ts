@@ -105,6 +105,8 @@ export type RiderJob = {
   distanceKm: number;
   minutes: number;
   prepaid: boolean;
+  /** What to show the rider about payment. Falls back to prepaid when absent. */
+  paymentLabel?: string;
   notes?: string;
 };
 

@@ -74,7 +74,7 @@ export function JobCard({
           */}
           {job.distanceKm > 0 ? <Meta icon="navigate-outline" label={`${job.distanceKm} km`} /> : null}
           {job.minutes > 0 ? <Meta icon="time-outline" label={`~${job.minutes} min`} /> : null}
-          <Meta icon="card-outline" label={job.prepaid ? 'Prepaid' : 'Cash on delivery'} />
+          <Meta icon="card-outline" label={job.paymentLabel ?? (job.prepaid ? 'Prepaid' : 'Cash on delivery')} />
         </View>
       </Pressable>
 
