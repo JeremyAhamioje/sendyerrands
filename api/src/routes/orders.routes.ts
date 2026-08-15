@@ -404,8 +404,32 @@ ordersRouter.post(
     });
 
     if (!order) throw notFound('Order');
-    if (['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(order.status)) {
+    /**
+     * Cancelling is refused per reason, because the reasons are not alike.
+     *
+     * MERCHANT_PAID is the one that matters most and was missing entirely. By
+     * then the customer has transferred the item cost straight to the seller's
+     * bank — Sendy never held it, cannot reverse it and cannot refund it.
+     * Letting the order be cancelled there would close it while their money sat
+     * with a stranger, and the app would look like it had handled something it
+     * has no power over.
+     *
+     * AT_DOORSTEP was missing too, so a rider could be standing at the door
+     * with the shopping while the order was cancelled underneath them.
+     */
+    if (order.status === 'MERCHANT_PAID') {
+      throw conflict(
+        'You have already paid the seller for this one, and that transfer cannot be reversed from here. Contact support.'
+      );
+    }
+    if (['PICKED_UP', 'IN_TRANSIT', 'AT_DOORSTEP'].includes(order.status)) {
       throw conflict('Your rider is already on the way. Contact support to cancel this one.');
+    }
+    if (order.status === 'DELIVERED') {
+      throw conflict('This order was already delivered.');
+    }
+    if (order.status === 'CANCELLED' || order.status === 'REFUNDED') {
+      throw conflict('This order is already cancelled.');
     }
 
     const updated = await transitionOrder(

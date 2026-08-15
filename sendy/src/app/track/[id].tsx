@@ -63,7 +63,26 @@ export default function TrackOrder() {
 
   /** The rider has the goods and is coming — the code becomes useful here. */
   const handingOver = ['PICKED_UP', 'IN_TRANSIT', 'AT_DOORSTEP'].includes(status);
-  const enRoute = status === 'PICKED_UP' || status === 'IN_TRANSIT';
+  const enRoute = ['PICKED_UP', 'IN_TRANSIT', 'AT_DOORSTEP'].includes(status);
+
+  /**
+   * Everything past the point of no return, mirroring the server's own refusals.
+   *
+   * Derived from one list rather than assembled from booleans: the old gate was
+   * `(unpaid || (live && !enRoute)) && status !== 'cancelled'`, which read as
+   * three separate rules and quietly let through every status nobody had
+   * thought about — AT_DOORSTEP, and MERCHANT_PAID, where the customer's money
+   * has already gone to a seller and nothing here can get it back.
+   */
+  const cannotCancel = [
+    'MERCHANT_PAID',
+    'PICKED_UP',
+    'IN_TRANSIT',
+    'AT_DOORSTEP',
+    'DELIVERED',
+    'CANCELLED',
+    'REFUNDED',
+  ].includes(status);
   // Everything between payment and delivery — the window where a map and a
   // rider card mean something.
   const live = order?.status === 'active' && !unpaid;
@@ -386,9 +405,9 @@ export default function TrackOrder() {
             </View>
           </Card>
 
-          {/* The server rejects a cancel once a rider has the parcel, so the
-              control disappears at pick-up rather than failing on tap. */}
-          {(unpaid || (live && !enRoute)) && order.status !== 'cancelled' ? (
+          {/* Gone rather than disabled: a greyed-out Cancel on a delivered
+              order still reads as something you could have done in time. */}
+          {!cannotCancel ? (
             <Pressable
               onPress={() => cancel.mutate({ id: order.id })}
               disabled={cancel.isPending}

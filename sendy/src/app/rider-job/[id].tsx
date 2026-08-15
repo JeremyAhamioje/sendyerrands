@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
-import { Badge, Card, Divider, Skeleton } from '@/components/ui/atoms';
+import { Card, Divider, Skeleton } from '@/components/ui/atoms';
 import { Button, IconButton } from '@/components/ui/Button';
 import { JOB_ROUTE, MapCanvas } from '@/components/ui/MapCanvas';
 import { Screen, StickyBar } from '@/components/ui/Screen';
@@ -20,11 +20,28 @@ export default function RiderJobDetail() {
   const router = useRouter();
   const { token } = useApp();
   const accept = useAcceptJob();
-  const { data: job } = useQuery({
+  const { data } = useQuery({
     queryKey: ['rider-job', id],
-    queryFn: async () => toRiderJob(await riderApi.job(id!, token!)),
+    queryFn: async () => {
+      const raw = await riderApi.job(id!, token!);
+      return { job: toRiderJob(raw), raw };
+    },
     enabled: Boolean(id && token),
   });
+
+  const job = data?.job;
+
+  /**
+   * The endpoint only returns jobs that are unclaimed OR already this rider's,
+   * so a non-null riderId here means it is mine.
+   *
+   * Without this the screen offered "Accept & start pickup" on a job the rider
+   * had already taken, and the only feedback was a 409 saying so — a button
+   * that cannot work, on a screen with no way onward to the job it is talking
+   * about.
+   */
+  const mine = Boolean(data?.raw.riderId);
+  const finished = ['DELIVERED', 'CANCELLED', 'REFUNDED'].includes(data?.raw.status ?? '');
 
   if (!job) {
     return (
@@ -113,9 +130,11 @@ export default function RiderJobDetail() {
             </View>
           ) : null}
 
-          <View className="items-center mt-5">
-            <Badge label="Expires in 1:45" tone="muted" icon="hourglass-outline" />
-          </View>
+          {/* "Expires in 1:45" was a hardcoded string that never counted down.
+              JOB_LOCK_SECONDS exists in the API config but nothing implements a
+              lock, so the badge promised a deadline that did not exist — and a
+              rider reading it would rush a decision for no reason. It comes back
+              when something actually expires. */}
         </ScrollView>
       </View>
 
@@ -129,20 +148,34 @@ export default function RiderJobDetail() {
             </Text>
           </View>
         ) : null}
-        <Button
-          title={accept.isPending ? 'Claiming…' : 'Accept & start pickup'}
-          iconRight="arrow-forward"
-          loading={accept.isPending}
-          // The job has to be claimed on the SERVER before the active screen
-          // opens. Navigating first showed a rider "DELIVERING" a job that was
-          // still on the open board for everyone else.
-          onPress={() =>
-            accept.mutate(job.id, {
-              onSuccess: () =>
-                router.replace({ pathname: '/rider-active/[id]', params: { id: job.id } }),
-            })
-          }
-        />
+        {finished ? (
+          // Nothing to do and nowhere to go. A live-looking CTA on a closed job
+          // is an offer the server will refuse.
+          <Button title="This job is finished" disabled onPress={() => {}} />
+        ) : mine ? (
+          <Button
+            title="Open this delivery"
+            iconRight="arrow-forward"
+            onPress={() =>
+              router.replace({ pathname: '/rider-active/[id]', params: { id: job.id } })
+            }
+          />
+        ) : (
+          <Button
+            title={accept.isPending ? 'Claiming…' : 'Accept & start pickup'}
+            iconRight="arrow-forward"
+            loading={accept.isPending}
+            // The job has to be claimed on the SERVER before the active screen
+            // opens. Navigating first showed a rider "DELIVERING" a job that was
+            // still on the open board for everyone else.
+            onPress={() =>
+              accept.mutate(job.id, {
+                onSuccess: () =>
+                  router.replace({ pathname: '/rider-active/[id]', params: { id: job.id } }),
+              })
+            }
+          />
+        )}
       </StickyBar>
     </Screen>
   );

@@ -157,6 +157,8 @@ export type ApiRiderJob = {
   id: string;
   reference: string;
   status: string;
+  /** Non-null on the detail endpoint only when this rider already holds it. */
+  riderId?: string | null;
   type: 'FOOD' | 'MARKETPLACE' | 'ERRAND' | 'PACKAGE';
   riderPayoutKobo: number;
   vendor?: { name: string; area: string | null } | null;
@@ -333,6 +335,14 @@ export function toBid(b: ApiBid): Bid {
   };
 }
 
+/**
+ * Every status a job card can be rendered in, not just the ones on the board.
+ *
+ * The board only ever shows unclaimed work, so the map covered those and let
+ * everything else fall through. The detail screen shows jobs a rider already
+ * holds — so an accepted errand hit the fallback and announced "Unpaid" over
+ * one the customer had already paid the fee for.
+ */
 const PAYMENT_LABEL: Record<string, string> = {
   QUOTE_REQUESTED: 'Needs pricing',
   PRICE_PROPOSED: 'Awaiting customer',
@@ -340,6 +350,12 @@ const PAYMENT_LABEL: Record<string, string> = {
   PENDING_PAYMENT: 'Unpaid',
   PLACED: 'Prepaid',
   VENDOR_ACCEPTED: 'Prepaid',
+  RIDER_ASSIGNED: 'In progress',
+  PICKED_UP: 'Collected',
+  IN_TRANSIT: 'On the way',
+  AT_DOORSTEP: 'At the door',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
 };
 
 export function toRiderJob(j: ApiRiderJob): RiderJob {
