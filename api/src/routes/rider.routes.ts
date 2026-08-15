@@ -83,7 +83,10 @@ riderRouter.get(
     const jobs = await prisma.order.findMany({
       where: {
         riderId: null,
-        status: { in: ['PLACED', 'VENDOR_ACCEPTED'] },
+        // QUOTE_REQUESTED is unpaid on purpose: an errand reaches the board
+        // before anyone knows what the item costs, because finding that out is
+        // the job. See the note in orders.routes.ts.
+        status: { in: ['PLACED', 'VENDOR_ACCEPTED', 'QUOTE_REQUESTED'] },
       },
       include: {
         vendor: { select: { name: true, area: true } },
@@ -466,5 +469,149 @@ riderRouter.post(
     }
 
     res.status(201).json({ data: doc });
+  })
+);
+
+/**
+ * The errand loop, rider side.
+ *
+ * Three pings, each one a thing only the rider can know: what the item actually
+ * costs, that they have it, and that they are at the door.
+ */
+const quoteSchema = z.object({
+  actualItemKobo: z.number().int().min(1, 'Enter what the item costs.'),
+  bankCode: z.string().min(3).max(10),
+  accountNumber: z.string().regex(/^\d{10}$/, 'Nigerian account numbers are 10 digits.'),
+});
+
+/**
+ * POST /rider/jobs/:id/quote
+ *
+ * The rider is standing at the stall. They report the real price and the
+ * merchant's account, and the account is resolved against Paystack before the
+ * customer ever sees it.
+ *
+ * Resolving is the whole safety property of the direct-to-merchant model. Sendy
+ * never touches this money, so there is nothing to reverse and nothing to
+ * refund — the only protection available is showing the customer whose account
+ * they are about to pay. A rider entering their own number has to watch their
+ * own name appear on the customer's screen.
+ *
+ * Re-quoting is allowed while the customer has not yet paid: prices move, and
+ * the alternative is cancelling the job and starting again.
+ */
+riderRouter.post(
+  '/jobs/:id/quote',
+  requireApprovedRider,
+  validate(quoteSchema),
+  asyncHandler(async (req, res) => {
+    const riderId = req.auth!.id;
+    const body = req.body as z.infer<typeof quoteSchema>;
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id!, riderId, type: 'ERRAND' },
+      include: { errandDetail: true },
+    });
+    if (!order) throw notFound('Errand');
+    if (!order.errandDetail) throw badRequest('That order has no errand details.');
+    if (!['RIDER_ASSIGNED', 'PRICE_PROPOSED'].includes(order.status)) {
+      throw conflict('This errand is past the pricing stage.');
+    }
+
+    // Throws with a useful message if the account does not exist, and passes
+    // Paystack's own wording through on a rate limit.
+    const resolved = await resolveAccount(body.accountNumber, body.bankCode);
+    const banks = await listBanks();
+    const bankName = banks.find((b) => b.code === body.bankCode)?.name ?? null;
+
+    await prisma.errandDetail.update({
+      where: { orderId: order.id },
+      data: {
+        actualItemKobo: body.actualItemKobo,
+        merchantBankCode: body.bankCode,
+        merchantAccountNo: resolved.accountNumber,
+        // Paystack's answer, never what the rider typed.
+        merchantAccountName: resolved.accountName,
+        merchantBankName: bankName,
+      },
+    });
+
+    const updated = await transitionOrder(order.id, 'PRICE_PROPOSED', {
+      type: 'rider',
+      id: riderId,
+    });
+
+    res.json({
+      data: {
+        order: updated,
+        merchant: {
+          accountName: resolved.accountName,
+          accountNumber: resolved.accountNumber,
+          bankName,
+        },
+      },
+    });
+  })
+);
+
+/**
+ * POST /rider/jobs/:id/asset-secured — the rider has the item.
+ *
+ * Gated on MERCHANT_PAID rather than allowed from PRICE_PROPOSED: a rider
+ * cannot mark an item collected before the customer says they have paid for it,
+ * which is the one ordering constraint the model depends on.
+ */
+riderRouter.post(
+  '/jobs/:id/asset-secured',
+  requireApprovedRider,
+  asyncHandler(async (req, res) => {
+    const riderId = req.auth!.id;
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id!, riderId, type: 'ERRAND' },
+    });
+    if (!order) throw notFound('Errand');
+    if (order.status !== 'MERCHANT_PAID') {
+      throw conflict(
+        order.status === 'PRICE_PROPOSED'
+          ? 'The customer has not confirmed payment to the seller yet.'
+          : 'This errand is not at the collection stage.'
+      );
+    }
+
+    await prisma.errandDetail.update({
+      where: { orderId: order.id },
+      data: { assetSecuredAt: new Date() },
+    });
+
+    const updated = await transitionOrder(order.id, 'PICKED_UP', { type: 'rider', id: riderId });
+    res.json({ data: updated });
+  })
+);
+
+/** POST /rider/jobs/:id/doorstep — the rider has arrived. */
+riderRouter.post(
+  '/jobs/:id/doorstep',
+  requireApprovedRider,
+  asyncHandler(async (req, res) => {
+    const riderId = req.auth!.id;
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id!, riderId },
+    });
+    if (!order) throw notFound('Job');
+    if (!['PICKED_UP', 'IN_TRANSIT'].includes(order.status)) {
+      throw conflict('Collect the item before announcing arrival.');
+    }
+
+    if (order.type === 'ERRAND') {
+      await prisma.errandDetail.updateMany({
+        where: { orderId: order.id },
+        data: { atDoorstepAt: new Date() },
+      });
+    }
+
+    const updated = await transitionOrder(order.id, 'AT_DOORSTEP', { type: 'rider', id: riderId });
+    res.json({ data: updated });
   })
 );

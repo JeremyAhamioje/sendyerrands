@@ -215,9 +215,23 @@ ordersRouter.post(
     const address = await prisma.address.findFirst({ where: { id: body.addressId, userId: customerId } });
     if (!address) throw notFound('Address');
 
-    // The rider's shopping budget is held now and reconciled from the receipt.
+    /**
+     * Nothing is charged here, and the estimate is not part of the total.
+     *
+     * An errand's price is not knowable at the point of ordering — that is the
+     * entire difference between this pillar and a food order, whose total is on
+     * the menu. Charging the customer's guess up front meant collecting a
+     * number nobody had checked, then reconciling against a receipt afterwards
+     * and refunding the difference. Every one of those refunds was a support
+     * conversation caused by a figure we invented.
+     *
+     * So the order costs the dispatch fee and only the dispatch fee. The item
+     * is paid by the customer straight to the merchant once a rider has stood
+     * in front of it and reported the real price. Sendy never holds that money,
+     * which is what lets this scale without working capital.
+     */
     const totals = computeTotals({
-      subtotalKobo: body.budgetKobo ?? 0,
+      subtotalKobo: 0,
       deliveryFeeKobo: env.DEFAULT_DELIVERY_FEE_KOBO,
     });
 
@@ -225,7 +239,11 @@ ordersRouter.post(
       data: {
         reference: orderReference(),
         type: 'ERRAND',
-        status: 'PENDING_PAYMENT',
+        // Unpaid and already visible to riders. The dispatch fee is collected
+        // at the same moment the customer accepts the real price, so there is
+        // one decision point rather than two, and nothing to refund if no rider
+        // ever picks the job up.
+        status: 'QUOTE_REQUESTED',
         customerId,
         addressId: address.id,
         deliveryCode: deliveryCode(),
@@ -386,6 +404,81 @@ ordersRouter.post(
       { type: 'customer', id: req.auth!.id },
       { note: req.body.reason, extra: { cancelReason: req.body.reason } }
     );
+
+    res.json({ data: updated });
+  })
+);
+
+/**
+ * POST /orders/:id/merchant-paid — the customer has transferred to the seller.
+ *
+ * Sendy never sees this money. It goes from the customer's bank straight to the
+ * merchant's, which is what removes the float, the licensing question and the
+ * whole class of "our balance is empty so the errand is stuck".
+ *
+ * The cost of that is that this endpoint records a CLAIM, not a fact: there is
+ * no transaction to verify against. What it does give a dispute is a timestamp,
+ * the resolved account name the customer was shown, and optionally their
+ * transfer receipt — which is most of what anyone arguing about this later
+ * actually needs.
+ *
+ * The dispatch fee is a separate, ordinary payment to Sendy and is collected
+ * through /payments/checkout like any other order.
+ */
+const merchantPaidSchema = z.object({
+  proofUrl: z.string().url().optional(),
+});
+
+ordersRouter.post(
+  '/:id/merchant-paid',
+  validate(merchantPaidSchema),
+  asyncHandler(async (req, res) => {
+    const customerId = req.auth!.id;
+    const { proofUrl } = req.body as z.infer<typeof merchantPaidSchema>;
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id!, customerId, type: 'ERRAND' },
+      include: { errandDetail: true },
+    });
+    if (!order) throw notFound('Errand');
+    if (order.status !== 'PRICE_PROPOSED') {
+      throw conflict(
+        order.status === 'QUOTE_REQUESTED'
+          ? 'No rider has priced this errand yet.'
+          : 'This errand is past the payment stage.'
+      );
+    }
+    // Refusing here rather than accepting a claim about an account that was
+    // never shown to anyone: without a resolved merchant there is nothing the
+    // customer could have paid, and nothing a dispute could point at.
+    if (!order.errandDetail?.merchantAccountNo) {
+      throw badRequest('The rider has not provided the seller’s account yet.');
+    }
+
+    /**
+     * The dispatch fee has to be settled first.
+     *
+     * This is the only enforcement point there is. Sendy never touches the item
+     * money, so the fee is the entire commercial relationship — and once the
+     * rider is told the seller has been paid, they collect the goods and the
+     * job is effectively done. Letting that happen unpaid means doing the work
+     * for free and chasing it afterwards.
+     */
+    const paid = await prisma.payment.findFirst({
+      where: { orderId: order.id, status: 'SUCCESS' },
+      select: { id: true },
+    });
+    if (!paid) throw conflict('Pay the Sendy Errands dispatch fee first.');
+
+    await prisma.errandDetail.update({
+      where: { orderId: order.id },
+      data: { merchantPaidAt: new Date(), paymentProofUrl: proofUrl },
+    });
+
+    const updated = await transitionOrder(order.id, 'MERCHANT_PAID', {
+      type: 'customer',
+      id: customerId,
+    });
 
     res.json({ data: updated });
   })

@@ -12,18 +12,37 @@ type Tx = PrismaClient | Prisma.TransactionClient;
  * what keeps the customer's tracking stepper honest.
  */
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  /**
+   * The errand lane. It runs alongside the paid-up-front lane rather than
+   * replacing it, because only errands have a price nobody knows at the point
+   * of ordering — a food order's total is on the menu.
+   *
+   * QUOTE_REQUESTED can go straight to CANCELLED, which is the common exit:
+   * most abandoned errands are ones no rider picked up.
+   */
+  QUOTE_REQUESTED: ['RIDER_ASSIGNED', 'CANCELLED'],
+  PRICE_PROPOSED: ['MERCHANT_PAID', 'PRICE_PROPOSED', 'CANCELLED'],
+  MERCHANT_PAID: ['PICKED_UP', 'CANCELLED'],
+
   PENDING_PAYMENT: ['PLACED', 'CANCELLED'],
   PLACED: ['VENDOR_ACCEPTED', 'RIDER_ASSIGNED', 'CANCELLED'],
   VENDOR_ACCEPTED: ['RIDER_ASSIGNED', 'CANCELLED'],
-  RIDER_ASSIGNED: ['PICKED_UP', 'CANCELLED'],
-  PICKED_UP: ['IN_TRANSIT', 'DELIVERED', 'CANCELLED'],
-  IN_TRANSIT: ['DELIVERED', 'CANCELLED'],
+  // An errand's rider prices the job before collecting anything, so
+  // RIDER_ASSIGNED leads to PRICE_PROPOSED there and PICKED_UP everywhere else.
+  RIDER_ASSIGNED: ['PRICE_PROPOSED', 'PICKED_UP', 'CANCELLED'],
+  PICKED_UP: ['IN_TRANSIT', 'AT_DOORSTEP', 'DELIVERED', 'CANCELLED'],
+  IN_TRANSIT: ['AT_DOORSTEP', 'DELIVERED', 'CANCELLED'],
+  AT_DOORSTEP: ['DELIVERED', 'CANCELLED'],
   DELIVERED: ['REFUNDED'],
   CANCELLED: ['REFUNDED'],
   REFUNDED: [],
 };
 
 const LABELS: Record<OrderStatus, string> = {
+  QUOTE_REQUESTED: 'Waiting for a rider',
+  PRICE_PROPOSED: 'Price confirmed — your approval needed',
+  MERCHANT_PAID: 'Paid the seller — rider collecting',
+  AT_DOORSTEP: 'Rider is at your door',
   PENDING_PAYMENT: 'Awaiting payment',
   PLACED: 'Order placed',
   VENDOR_ACCEPTED: 'Vendor accepted',

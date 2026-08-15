@@ -75,12 +75,25 @@ enum OrderType {
 }
 
 enum OrderStatus {
+  /// Errands only. Posted with an estimate, unpaid, visible to every rider.
+  /// The price is not knowable until someone stands in the market and looks,
+  /// so nothing is charged until a rider has been and reported back.
+  QUOTE_REQUESTED
+  /// A rider has priced the item and named the merchant account. Waiting on
+  /// the customer to accept the real price.
+  PRICE_PROPOSED
+  /// Customer says they have transferred the item cost to the merchant
+  /// directly. Sendy never touches that money — only the dispatch fee.
+  MERCHANT_PAID
   PENDING_PAYMENT
   PLACED
   VENDOR_ACCEPTED
   RIDER_ASSIGNED
   PICKED_UP
   IN_TRANSIT
+  /// The rider is at the door. A distinct state because it is the moment the
+  /// customer has to do something — come out, or answer the phone.
+  AT_DOORSTEP
   DELIVERED
   CANCELLED
   REFUNDED
@@ -447,7 +460,27 @@ model ErrandDetail {
   details       String?
   pickupName    String
   pickupAddress String
+  /// What the customer guessed before anyone had looked. Never charged — it
+  /// exists so a rider can judge whether the job is worth accepting.
   budgetKobo    Int?
+  /// What the rider found it actually costs, entered at the stall.
+  actualItemKobo Int?
+  /// The merchant's account, entered by the rider and resolved against
+  /// Paystack before the customer ever sees it. The resolved holder name is
+  /// the whole safety property: a rider who types their own account number
+  /// has to watch their own name appear on the customer's screen.
+  merchantBankCode    String?
+  merchantAccountNo   String?
+  merchantAccountName String?
+  merchantBankName    String?
+  /// When the customer said they had transferred. Sendy cannot verify this —
+  /// the money never passes through it — so this is a claim with a timestamp,
+  /// which is still most of what a dispute needs.
+  merchantPaidAt   DateTime?
+  paymentProofUrl  String?
+  /// The two rider pings.
+  assetSecuredAt DateTime?
+  atDoorstepAt   DateTime?
   // What the rider actually spent, from the receipt. Change is refunded.
   spentKobo     Int?
   receiptUrl    String?

@@ -55,7 +55,21 @@ paymentsRouter.post(
 
     const order = await prisma.order.findFirst({ where: { id: orderId, customerId } });
     if (!order) throw notFound('Order');
-    if (order.status !== 'PENDING_PAYMENT') throw conflict('This order has already been paid for.');
+    /**
+     * Errands pay at a different moment, so they gate on a different status.
+     *
+     * Every other pillar knows its total when the order is created and sits at
+     * PENDING_PAYMENT until it is settled. An errand does not have a total
+     * until a rider has stood in front of the item, so it reaches
+     * PRICE_PROPOSED unpaid and the dispatch fee is collected when the customer
+     * accepts the real price. The item itself never passes through here — it
+     * goes from the customer's bank to the merchant's.
+     */
+    const payable =
+      order.status === 'PENDING_PAYMENT' ||
+      (order.type === 'ERRAND' && order.status === 'PRICE_PROPOSED');
+
+    if (!payable) throw conflict('This order has already been paid for.');
 
     if (method === 'WALLET') {
       const result = await prisma.$transaction(async (tx) => {
@@ -91,7 +105,12 @@ paymentsRouter.post(
           },
         });
 
-        await transitionOrder(order.id, 'PLACED', { type: 'customer', id: customerId }, { tx });
+        // An errand keeps its place in its own lane: paying the dispatch fee
+        // does not mean the seller has been paid, which is what MERCHANT_PAID
+        // records. Moving it to PLACED here would skip that entirely.
+        if (order.type !== 'ERRAND') {
+          await transitionOrder(order.id, 'PLACED', { type: 'customer', id: customerId }, { tx });
+        }
 
         return { payment, balanceKobo };
       });
