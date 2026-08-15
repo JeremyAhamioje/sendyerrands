@@ -687,13 +687,20 @@ export type Category = {
   icon: string;
   badge?: string;
   href?: string;
+  /**
+   * A second line under the label. Home carries two parcel tiles that look
+   * identical at 30px, and the difference between them — whether it crosses a
+   * state line — changes the price and the number of days. Without this the
+   * choice is a coin flip.
+   */
+  caption?: string;
   /** Rendered grey and inert, with a 'Coming soon' caption. */
   comingSoon?: boolean;
 };
 
 export const CATEGORIES: Category[] = [
   { slug: 'errands', label: 'Errands', icon: 'receipt-outline', href: '/errand' },
-  { slug: 'logistics', label: 'Logistics', icon: 'trail-sign-outline', href: '/logistics' },
+  { slug: 'logistics', label: 'Logistics', icon: 'trail-sign-outline', href: '/logistics', caption: 'Between states' },
   { slug: 'marketplace', label: 'Marketplace', icon: 'storefront-outline', badge: 'NEW', href: '/marketplace' },
   { slug: 'shops', label: 'Shops', icon: 'bag-handle-outline' },
   { slug: 'pharmacy', label: 'Pharmacy', icon: 'medkit-outline' },
@@ -702,7 +709,7 @@ export const CATEGORIES: Category[] = [
   // behind it; a tile that opens an empty screen is worse than one that says
   // it is not ready.
   { slug: 'bills', label: 'Bills', icon: 'reader-outline', comingSoon: true },
-  { slug: 'packages', label: 'Packages', icon: 'cube-outline', href: '/package' },
+  { slug: 'packages', label: 'Packages', icon: 'cube-outline', href: '/package', caption: 'Same city' },
 ];
 
 export const RECENT_SEARCHES = ['Jollof rice', 'iPhone charger', 'Pharmacy near me', 'Dangote rice'];

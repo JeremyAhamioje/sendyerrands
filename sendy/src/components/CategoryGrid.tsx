@@ -70,11 +70,13 @@ function CategoryTile({ category, onPress }: { category: Category; onPress?: () 
       >
         {category.label}
       </Text>
-      {/* The caption is what stops grey reading as "broken". Without it the
-          tile is just a dimmer version of the working ones. */}
-      {soon ? (
+      {/* For a coming-soon tile this is what stops grey reading as "broken" —
+          without it the tile is just a dimmer version of the working ones.
+          Elsewhere it separates the two parcel tiles, which are otherwise the
+          same picture of a box. */}
+      {soon || category.caption ? (
         <Text className="text-muted text-[10px] text-center mt-0.5" numberOfLines={1}>
-          Coming soon
+          {soon ? 'Coming soon' : category.caption}
         </Text>
       ) : null}
     </Pressable>

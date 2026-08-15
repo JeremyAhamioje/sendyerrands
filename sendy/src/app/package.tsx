@@ -90,6 +90,30 @@ export default function SendPackage() {
       <ScreenHeader title="Send a package" />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+        {/*
+          This form is same-city only: it prices on parcel size alone and quotes
+          same-day, both of which are wrong the moment a parcel crosses a state
+          line. Someone who ends up here for a Lagos → Kano parcel would fill in
+          two addresses, be quoted ₦1,300, and find out at handover. Saying so
+          costs one line and the way out is a tap.
+        */}
+        <Pressable
+          onPress={() => router.replace('/logistics')}
+          accessibilityRole="button"
+          className="flex-row items-center bg-surface rounded-md p-3.5 mb-5"
+        >
+          <Ionicons name="trail-sign-outline" size={18} color={colors.pink[600]} />
+          <View className="flex-1 ml-2.5">
+            <Text className="text-ink text-[13px] font-semibold">
+              Same city, same day
+            </Text>
+            <Text className="text-body text-[12px] mt-0.5 leading-[17px]">
+              Sending to another state? Use Logistics instead.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+        </Pressable>
+
         {/* route */}
         <Card className="p-4 mb-6">
           <View className="flex-row items-center mb-3">
