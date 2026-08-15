@@ -57,22 +57,54 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
    * and acted on, and unwinding it risks paying the same earnings twice.
    * Callers must be able to tell those apart, so they cannot share a code.
    */
-  let res: Response;
-  try {
-    res = await fetch(`${env.PAYSTACK_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-        ...init?.headers,
-      },
-    });
-  } catch (cause) {
+  /**
+   * Reads retry, writes never.
+   *
+   * A GET can be repeated safely: asking twice who owns an account, or for the
+   * bank list, costs a round trip and nothing else. A POST cannot — retrying
+   * /transfer after a dropped connection risks sending the same money twice,
+   * which is the entire reason PAYSTACK_UNREACHABLE exists as a separate code.
+   *
+   * Keying this off the HTTP method rather than a flag callers pass means a new
+   * write endpoint is safe by default: it has to be a GET to be retried, and
+   * nobody can opt a transfer in by mistake.
+   *
+   * One retry, not three. A rider standing at a stall waiting on a quote would
+   * rather see an error at four seconds than a spinner at fifteen.
+   */
+  const isRead = !init?.method || init.method === 'GET';
+  const attempts = isRead ? 2 : 1;
+
+  let res: Response | undefined;
+  let lastCause: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      res = await fetch(`${env.PAYSTACK_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+          ...init?.headers,
+        },
+      });
+      break;
+    } catch (cause) {
+      lastCause = cause;
+      if (attempt === attempts) break;
+      console.warn(`[paystack] ${path} failed to connect, retrying once`);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
+  if (!res) {
     throw new AppError(
       504,
       'PAYSTACK_UNREACHABLE',
-      'We could not reach the payment provider. The request may or may not have gone through.',
-      { cause: cause instanceof Error ? cause.message : String(cause) }
+      isRead
+        ? 'We could not reach the payment provider. Try again in a moment.'
+        : 'We could not reach the payment provider. The request may or may not have gone through.',
+      { cause: lastCause instanceof Error ? lastCause.message : String(lastCause) }
     );
   }
 

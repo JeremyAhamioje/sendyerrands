@@ -592,6 +592,17 @@ export function useRiderActive() {
       return j ? { job: toRiderJob(j), raw: j } : null;
     },
     enabled: Boolean(token),
+    /**
+     * An errand has two states where the rider is waiting on someone else: the
+     * customer approving a price, and the customer confirming they paid the
+     * seller. Nothing in the app tells them when that happens, so without a
+     * poll a rider stands in a market watching a screen that will never change
+     * and has no reason to think refreshing would help.
+     */
+    refetchInterval: (query) => {
+      const status = query.state.data?.raw.status;
+      return status === 'PRICE_PROPOSED' || status === 'RIDER_ASSIGNED' ? 15_000 : false;
+    },
   });
 }
 
@@ -898,6 +909,11 @@ export function useQuoteErrand(jobId: string) {
     mutationFn: (body: { actualItemKobo: number; bankCode: string; accountNumber: string }) =>
       riderErrandApi.quote(jobId, body, token!),
     onSuccess: () => {
+      // 'rider-active' is the one that matters: it is what the active-delivery
+      // screen renders. Leaving it out meant a successful action left the old
+      // panel on screen, so the rider pressed again and got a 409 telling them
+      // the job was not at a stage it had already passed.
+      qc.invalidateQueries({ queryKey: ['rider-active'] });
       qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
       qc.invalidateQueries({ queryKey: ['rider-jobs'] });
     },
@@ -911,6 +927,7 @@ export function useAssetSecured(jobId: string) {
   return useMutation({
     mutationFn: () => riderErrandApi.assetSecured(jobId, token!),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rider-active'] });
       qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
       qc.invalidateQueries({ queryKey: ['rider-deliveries'] });
     },
@@ -924,6 +941,7 @@ export function useAtDoorstep(jobId: string) {
   return useMutation({
     mutationFn: () => riderErrandApi.atDoorstep(jobId, token!),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rider-active'] });
       qc.invalidateQueries({ queryKey: ['rider-job', jobId] });
       qc.invalidateQueries({ queryKey: ['rider-deliveries'] });
     },

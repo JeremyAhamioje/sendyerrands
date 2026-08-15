@@ -610,6 +610,21 @@ riderRouter.post(
       where: { id: req.params.id!, riderId, type: 'ERRAND' },
     });
     if (!order) throw notFound('Errand');
+
+    /**
+     * Already done is success, not a conflict.
+     *
+     * A rider whose screen has not caught up presses again — which is exactly
+     * what a stale cache produces — and got told the errand was "not at the
+     * collection stage" for a stage it had already passed. That reads as the
+     * app losing their work at the moment they are holding someone's shopping.
+     * Repeating the request returns the same answer instead.
+     */
+    if (['PICKED_UP', 'IN_TRANSIT', 'AT_DOORSTEP', 'DELIVERED'].includes(order.status)) {
+      const current = await prisma.order.findUnique({ where: { id: order.id } });
+      return res.json({ data: current });
+    }
+
     if (order.status !== 'MERCHANT_PAID') {
       throw conflict(
         order.status === 'PRICE_PROPOSED'
@@ -639,6 +654,13 @@ riderRouter.post(
       where: { id: req.params.id!, riderId },
     });
     if (!order) throw notFound('Job');
+
+    // Same reasoning as asset-secured: a second press is the same intent.
+    if (['AT_DOORSTEP', 'DELIVERED'].includes(order.status)) {
+      const current = await prisma.order.findUnique({ where: { id: order.id } });
+      return res.json({ data: current });
+    }
+
     if (!['PICKED_UP', 'IN_TRANSIT'].includes(order.status)) {
       throw conflict('Collect the item before announcing arrival.');
     }
