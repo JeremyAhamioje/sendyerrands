@@ -18,6 +18,10 @@ import { colors, shadow } from '@/lib/theme';
  * status. Anything generic here reads as a promise the order hasn't made yet.
  */
 const HEADLINE: Record<string, string> = {
+  QUOTE_REQUESTED: 'Finding you a rider',
+  PRICE_PROPOSED: 'The rider found it',
+  MERCHANT_PAID: 'Rider is collecting it',
+  AT_DOORSTEP: 'Your rider is at the door',
   PENDING_PAYMENT: 'Pay to confirm this order',
   PLACED: 'Waiting for the vendor',
   VENDOR_ACCEPTED: 'Being prepared',

@@ -239,15 +239,29 @@ export function toProduct(p: ApiProduct): Product {
   };
 }
 
-const ACTIVE_STATUSES = ['PENDING_PAYMENT', 'PLACED', 'VENDOR_ACCEPTED', 'RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'];
+/**
+ * Only these two mean an order is over and did not arrive.
+ *
+ * This used to be the other way round — a list of active statuses, with
+ * everything else falling through to 'cancelled'. That makes adding a status to
+ * the API a silent client bug: the four errand states landed here and every one
+ * of them rendered "This order was cancelled" on a live order. Listing the
+ * terminal ones instead means an unknown status reads as active, which is wrong
+ * far less often and never alarming.
+ */
+const CANCELLED_STATUSES = ['CANCELLED', 'REFUNDED'];
 
 const STATUS_COPY: Record<string, string> = {
+  QUOTE_REQUESTED: 'Waiting for a rider',
+  PRICE_PROPOSED: 'Price confirmed — your approval needed',
+  MERCHANT_PAID: 'Paid the seller',
   PENDING_PAYMENT: 'Awaiting payment',
   PLACED: 'Order placed',
   VENDOR_ACCEPTED: 'Vendor accepted',
   RIDER_ASSIGNED: 'Rider assigned',
   PICKED_UP: 'Picked up',
   IN_TRANSIT: 'On the way',
+  AT_DOORSTEP: 'At your door',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
   REFUNDED: 'Refunded',
@@ -268,6 +282,12 @@ function orderTitle(o: ApiOrder): string {
   return o.reference;
 }
 
+/** Last resort for a status the app has no copy for. Never the enum itself. */
+function humanise(status: string): string {
+  const words = status.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function toOrder(o: ApiOrder): Order {
   const title = orderTitle(o);
   return {
@@ -277,8 +297,14 @@ export function toOrder(o: ApiOrder): Order {
     type: TYPE_LABEL[o.type],
     total: koboToNaira(o.totalKobo),
     placedAt: formatWhen(o.placedAt ?? o.createdAt),
-    status: ACTIVE_STATUSES.includes(o.status) ? 'active' : o.status === 'DELIVERED' ? 'delivered' : 'cancelled',
-    statusLabel: STATUS_COPY[o.status] ?? o.status,
+    status: CANCELLED_STATUSES.includes(o.status)
+      ? 'cancelled'
+      : o.status === 'DELIVERED'
+        ? 'delivered'
+        : 'active',
+    // Falling back to the raw enum put "QUOTE_REQUESTED" on screen, three times.
+    // Title case at least reads as English while a label is missing.
+    statusLabel: STATUS_COPY[o.status] ?? humanise(o.status),
     itemCount: o.items?.reduce((n, i) => n + i.quantity, 0) ?? 1,
     thumb: thumbFrom(title, o.vendor?.coverUrl, [o.type]),
   };

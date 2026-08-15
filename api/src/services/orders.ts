@@ -163,23 +163,54 @@ export function buildStepper(
   type?: OrderType
 ) {
   const hasVendor = type !== 'PACKAGE' && type !== 'ERRAND';
+  const isErrand = type === 'ERRAND';
 
-  const flow: OrderStatus[] = [
-    'PLACED',
-    ...(hasVendor ? (['VENDOR_ACCEPTED'] as OrderStatus[]) : []),
-    'RIDER_ASSIGNED',
-    'PICKED_UP',
-    'IN_TRANSIT',
-    'DELIVERED',
-  ];
+  /**
+   * An errand never passes through PLACED — it is posted unpaid at
+   * QUOTE_REQUESTED and priced by a rider before any money moves. Running it
+   * through the shared flow put currentIndex at -1, so every step rendered
+   * pending on an order that was visibly progressing.
+   */
+  const flow: OrderStatus[] = isErrand
+    ? [
+        'QUOTE_REQUESTED',
+        'RIDER_ASSIGNED',
+        'PRICE_PROPOSED',
+        'MERCHANT_PAID',
+        'PICKED_UP',
+        'AT_DOORSTEP',
+        'DELIVERED',
+      ]
+    : [
+        'PLACED',
+        ...(hasVendor ? (['VENDOR_ACCEPTED'] as OrderStatus[]) : []),
+        'RIDER_ASSIGNED',
+        'PICKED_UP',
+        'IN_TRANSIT',
+        'AT_DOORSTEP',
+        'DELIVERED',
+      ];
+
+  /**
+   * Step copy, which is not the same as status copy: a stepper reads as a list
+   * of things that have happened, so "Price confirmed" rather than the status
+   * line's "Price confirmed — your approval needed".
+   */
+  const ERRAND_STEPS: Partial<Record<OrderStatus, string>> = {
+    QUOTE_REQUESTED: 'Errand posted',
+    RIDER_ASSIGNED: 'Rider assigned',
+    PRICE_PROPOSED: 'Price confirmed',
+    MERCHANT_PAID: 'Seller paid',
+    PICKED_UP: 'Items collected',
+    AT_DOORSTEP: 'At your door',
+    DELIVERED: 'Delivered',
+  };
 
   // Pickup copy depends on where the rider actually collects from.
-  const label = (status: OrderStatus) =>
-    status === 'PICKED_UP' && !hasVendor
-      ? type === 'ERRAND'
-        ? 'Items collected'
-        : 'Picked up from sender'
-      : LABELS[status];
+  const label = (status: OrderStatus) => {
+    if (isErrand) return ERRAND_STEPS[status] ?? LABELS[status];
+    return status === 'PICKED_UP' && !hasVendor ? 'Picked up from sender' : LABELS[status];
+  };
 
   const seen = new Map(events.map((e) => [e.status, e.createdAt]));
 

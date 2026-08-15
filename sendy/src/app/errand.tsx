@@ -17,7 +17,7 @@ import { useApp } from '@/store/app';
 const MAX_PHOTOS = 3;
 
 /** A picked image: local while it uploads, permanent URL once it lands. */
-type Photo = { localUri: string; url: string | null; failed: boolean };
+type Photo = { localUri: string; url: string | null; failed: boolean; reason?: string | null };
 
 /** Create Errand (design.md §10) — the first service pillar. */
 export default function CreateErrand() {
@@ -70,8 +70,13 @@ export default function CreateErrand() {
     try {
       const url = await upload.mutateAsync(asset);
       setPhotos((prev) => prev.map((p) => (p.localUri === asset.uri ? { ...p, url } : p)));
-    } catch {
-      setPhotos((prev) => prev.map((p) => (p.localUri === asset.uri ? { ...p, failed: true } : p)));
+    } catch (err) {
+      // Keep why. "Try again" is bad advice for a file that is too large or a
+      // provider that is not configured — both fail identically forever.
+      const reason = err instanceof Error ? err.message : null;
+      setPhotos((prev) =>
+        prev.map((p) => (p.localUri === asset.uri ? { ...p, failed: true, reason } : p))
+      );
     }
   }
 
@@ -208,7 +213,8 @@ export default function CreateErrand() {
 
         {photos.some((p) => p.failed) ? (
           <Text className="text-error text-[13px] mb-4 -mt-2">
-            A photo didn’t upload. Remove it and try again, or post without it.
+            {photos.find((p) => p.failed)?.reason ?? 'A photo didn’t upload.'} Remove it and post
+            without it, or try a different picture.
           </Text>
         ) : null}
 

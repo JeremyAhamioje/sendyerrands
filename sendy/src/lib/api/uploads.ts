@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { api } from './client';
 
@@ -55,12 +56,30 @@ export async function uploadImage(
   const sig = await api.post<Signature>('/uploads/signature', { folder }, token);
 
   const form = new FormData();
-  // React Native's FormData takes this {uri, name, type} shape rather than a Blob.
-  form.append('file', {
-    uri: asset.uri,
-    name: asset.fileName ?? `upload-${Date.now()}.jpg`,
-    type: asset.mimeType ?? 'image/jpeg',
-  } as unknown as Blob);
+  const filename = asset.fileName ?? `upload-${Date.now()}.jpg`;
+
+  /**
+   * The file part differs by platform, and getting it wrong fails silently.
+   *
+   * React Native's FormData accepts a {uri, name, type} descriptor and streams
+   * the file itself. The web's does not: it stringifies that object to
+   * "[object Object]" and posts it as a text field, so Cloudinary receives a
+   * request with no image and rejects it — which surfaced in the app as "a
+   * photo didn't upload", with retrying equally doomed every time.
+   *
+   * On web the URI is a blob:/data: URL, so it has to be fetched into a real
+   * Blob first.
+   */
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(asset.uri)).blob();
+    form.append('file', blob, filename);
+  } else {
+    form.append('file', {
+      uri: asset.uri,
+      name: filename,
+      type: asset.mimeType ?? 'image/jpeg',
+    } as unknown as Blob);
+  }
   form.append('api_key', sig.apiKey);
   form.append('timestamp', String(sig.timestamp));
   form.append('folder', sig.folder);
@@ -70,7 +89,12 @@ export async function uploadImage(
   const json = (await res.json()) as { secure_url?: string; error?: { message?: string } };
 
   if (!res.ok || !json.secure_url) {
-    throw new Error(json.error?.message ?? 'That image could not be uploaded.');
+    // Cloudinary's own wording — "Invalid Signature", "File size too large" —
+    // is far more actionable than anything inferable here, and without it every
+    // cause looked identical from the app.
+    const reason = json.error?.message ?? `Upload failed (HTTP ${res.status})`;
+    console.warn('[uploads] cloudinary rejected the image:', reason);
+    throw new Error(reason);
   }
 
   return json.secure_url;
